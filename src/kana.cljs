@@ -286,20 +286,20 @@
 (defonce doubled-consonants
   (for [syl syllabary
         :let [h (:h syl)]
-        :when (and h (not (contains? VOWELS h)) (not (contains? "ん" h)))
-        :let [r (:r syl)
+        :when (and h (not (contains? VOWELS h)))
+        :let [r (get-first syl :ks :r)
               h' (str "っ" h)
               k (str "ッ" (:k syl))]]
-    (assoc syl :h h' :k k :r (str (first r) r))))
+    (assoc syl :h h' :k k :ks (str (first r) r))))
 
 (defonce long-vowels
   (for [syl syllabary
         :let [h (:h syl)]
-        :when (and h (contains? VOWELS h))
-        :let [r (:r syl)
-              h' (str "ー" h)
-              k (str "ー" (:k syl))]]
-    (assoc syl :h h' :k k :r (str r r))))
+        :when (and h (not (contains? "ん" h)))
+        :let [r (get-first syl :ks :r)
+              h' (str h "ー")
+              k (str (:k syl) "ー")]]
+    (assoc syl :h h' :k k :ks (str r (last r)))))
 
 (defonce sym-syl
   (concatv (for [syl (concat syllabary doubled-consonants long-vowels)
