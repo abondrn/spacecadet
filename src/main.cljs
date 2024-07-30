@@ -42,17 +42,27 @@
 ; https://teamjapanese.com/stop-in-japanese/
 (defonce Q ["quit" "stop" "exit" "q" "yamete" "yamero" "tomare" "mouii" "sutoppu"])
 
-(def results (atom []))
 (def exit (atom false))
 
 (defn in? [xs el] (some #(= % el) xs))
 
+(defn sum [xs]
+  (reduce + xs))
+
+(defn ne-change [change] (and (not= (get change 0) 0)
+                              (not (str/blank? (get change 1)))))
+
+(defn diffs [input answer-or-answers]
+  (if (string? answer-or-answers)
+    (diff input answer-or-answers)
+    (apply min-key
+     (fn [d] (sum (for [change d :when (ne-change change)] (count (get change 1)))))
+     (map #(diff input %) answer-or-answers))))
+
 (defn diff-attempt [input answer message]
   ;(println "\n" input answer)
-  (let [raw-diff (diff input answer)
-        stripped-diff (filter (fn [change] (and (not= (get change 0) 0)
-                                                (not (str/blank? (get change 1)))))
-                              raw-diff)]
+  (let [raw-diff (diffs input answer)
+        stripped-diff (filter ne-change raw-diff)]
     (cond ; no diff
           (== 0 (count stripped-diff)) true
           ; show answer
@@ -83,10 +93,10 @@
                                         (swap! attempts inc)
                                         (diff-attempt input target message))}])
           end (.now js/Date)]
-    (swap! results conj {:target target
-                         :message message
-                         :duration (/ (- end start) 1000)
-                         :reattempts (dec @attempts)})))
+    {:target target
+     :message message
+     :duration (/ (- end start) 1000)
+     :reattempts (dec @attempts)}))
 
 (defn quiz-numbers []
   (let [num (num/randnum 0 4)
@@ -139,17 +149,25 @@
    ])
 
 (defn quiz-objects []
-  (let [obj (rand-nth OBJECTS)
-        eng (if (string? (:eng obj)) (:eng obj) (first (:eng obj)))
-        jap (or (:kat obj) (:hir obj))
-        eng->jap? (zero? (rand-int 2))
-        target (if eng->jap? (k/romanize jap) eng)
-        msg (if eng->jap? (str "Translate to Japanese: " eng) (str "Translate to English: " jap))]
-    (quiz-loop target msg)))
+  (let [questions (for [obj OBJECTS
+                        :let [eng (:eng obj)
+                              jap (or (:kat obj) (:hir obj))]
+                        e2j? [true false]]
+                    (if e2j?
+                      [(str "Translate to Japanese: " (if (string? eng) eng (str/join "/" eng))) (k/romanize jap)]
+                      [(str "Translate to English: " jap) eng]))]
+    (p/loop [curr-questions (shuffle questions) next-questions []]
+      (cond (not-empty curr-questions) (p/let [[msg target] (first curr-questions)
+                                                res (quiz-loop target msg)]
+                                         (if (zero? (:reattempts res))
+                                           (p/recur (rest curr-questions) next-questions)
+                                           (p/recur (rest curr-questions) (conj next-questions [msg target]))))
+            (not-empty next-questions) (p/recur (shuffle next-questions) [])
+            :else 'done))))
 
 (defn -main []
   (println "Press Ctrl+C to exit.")
-  (.on js/process "SIGINT" handle-sigint)
+  ;(.on js/process "SIGINT" handle-sigint)
   (p/let [selection (prompt {:name "choice"
                              :type "list"
                              :message "What do you want to practice"
@@ -164,6 +182,5 @@
                  "objects" quiz-objects)]
     (p/loop []
       (quiz)
-      (if (not @exit)
-        (p/recur)
-        (println @results)))))
+      (when (not @exit)
+        (p/recur)))))
