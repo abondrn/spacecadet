@@ -55,6 +55,9 @@
 (defn sum [xs]
   (reduce + xs))
 
+(defn mean [xs]
+  (/ (sum xs) (count xs)))
+
 (defn ne-change [change] (and (not= (get change 0) 0)
                               (not (str/blank? (get change 1)))))
 
@@ -139,14 +142,18 @@
                         [(str "Translate to English: " jap) eng]))
           log (transient [])]
       (p/loop [curr-questions (shuffle questions) next-questions []]
-        (cond (not-empty curr-questions) (p/let [[msg target] (first curr-questions)
-                                                 res (quiz-loop target msg)]
+        (cond
+          (not-empty curr-questions) (p/let [[msg target] (first curr-questions)
+                                             res (quiz-loop target msg)]
+                                       (if @exit
+                                         (persistent! log)
+                                         (do
                                            (conj! log res)
                                            (if (zero? (:reattempts res))
                                              (p/recur (rest curr-questions) next-questions)
-                                             (p/recur (rest curr-questions) (conj next-questions [msg target]))))
-              (not-empty next-questions) (p/recur (shuffle next-questions) [])
-              :else (persistent! log))))))
+                                             (p/recur (rest curr-questions) (conj next-questions [msg target]))))))
+          (not-empty next-questions) (p/recur (shuffle next-questions) [])
+          :else (persistent! log))))))
 
 (defonce quiz-objects
   (quiz-terms
@@ -207,8 +214,18 @@
                  "objects" quiz-objects
                  "events" quiz-events
                  "locations" quiz-locations
-                 "expressions" quiz-expressions)]
+                 "expressions" quiz-expressions)
+          is-list? (in? ["objects" "events" "locations" "expressions"] (.-choice selection))
+          log (atom [])]
     (p/loop []
-      (quiz)
-      (when (not @exit)
-        (p/recur)))))
+      (p/let [res (quiz)]
+        (if (not @exit)
+          (do
+            (if is-list?
+              (swap! log into res)
+              (swap! log conj res))
+            (p/recur))
+          
+          (println {:questions (count @log)
+                    :avg-mistakes (sum (for [l @log] (:reattempts l)))
+                    :avg-time (mean (for [l @log] (:duration l)))}))))))
