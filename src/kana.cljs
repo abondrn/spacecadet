@@ -1,6 +1,8 @@
 (ns src.kana
   (:require
-   [src.trie :as t]))
+   [src.trie :as t]
+   
+   [clojure.pprint :as pprint]))
 
 ; source: https://github.com/kanasubs/namban/blob/master/src/namban/shocho.cljx
 (defonce syllabary
@@ -217,20 +219,14 @@
     ; Limited to international relations and situations with prior precedent in
     ; which a sudden spelling reform would be difficult
     ; kunrei->x only
-   {:ks "sha" :h "しゃ" :k "シャ"} {:ks "shi" :h "し" :k "シ"}
+   {:ks "sha" :h "しゃ" :k "シャ"}
    {:ks "shu" :h "しゅ" :k "シュ"} {:ks "sho" :h "しょ" :k "ショ"}
 
-   {:ks "tsu" :h "つ" :k "ツ"}
-
-   {:ks "cha" :h "ちゃ" :k "チャ"} {:ks "chi" :h "ち" :k "チ"}
+   {:ks "cha" :h "ちゃ" :k "チャ"}
    {:ks "chu" :h "ちゅ" :k "チュ"} {:ks "cho" :h "ちょ" :k "チョ"}
 
-   {:ks "fu" :h "ふ" :k "フ"}
-
-   {:ks "ja" :h "じゃ" :k "ジャ"} {:ks "ji" :h "じ" :k "ジ"}
+   {:ks "ja" :h "じゃ" :k "ジャ"}
    {:ks "ju" :h "じゅ" :k "ジュ"} {:ks "jo" :h "じょ" :k "ジョ"}
-
-   {:ks "di" :h "ぢ" :k "ヂ" :r "ji"} {:ks "du" :h "づ" :k "ヅ" :r "zu"}
 
    {:ks "dya" :h "ぢゃ" :k "ヂャ" :r "ja"} {:ks "dyu" :h "ぢゅ" :k "ヂュ" :r "ju"}
    {:ks "dyo" :h "ぢょ" :k "ヂョ" :r "jo"}
@@ -242,11 +238,11 @@
    {:ks "wo" :h "を" :k "ヲ" :r "o"}
 
     ; ヶ choose from below which version to use, according to use frequency
-   {:k "ヶ" :h "か" :r "ka"} ; for counter - tatoeba 一ヶ月
+    ;{:k "ヶ" :h "か" :r "ka"} ; for counter - tatoeba 一ヶ月
     ;{:k "ヶ" :h "が" :r "ga"} ; for conjuntive particle が
     ;{:k "ヶ" :h "こ" :r "ko"} ; for counter too
     ; ヵ
-   {:h "か" :k "ヵ" :r "ka"} ; for counter sometimes when pronounced "ka"
+    ;{:h "か" :k "ヵ" :r "ka"} ; for counter sometimes when pronounced "ka"
 
     ;other
     ; order counts - ぢ syllab forms must go after じ forms above
@@ -281,30 +277,31 @@
         (get coll (first ks'))
         (recur (rest ks'))))))
 
-(defonce VOWELS "あいえうお")
+(defonce VOWELS (set "あいえうお"))
 
 (defonce doubled-consonants
   (for [syl syllabary
         :let [h (:h syl)]
         :when (and h (not (contains? VOWELS h)))
-        :let [r (get-first syl :ks :r)
+        :let [r (get-first syl :r :ks)
               h' (str "っ" h)
               k (str "ッ" (:k syl))]]
-    (assoc syl :h h' :k k :ks (str (first r) r))))
+    (assoc syl :h h' :k k :r (str (first r) r))))
 
+; TODO fix entries for hiragana
 (defonce long-vowels
   (for [syl syllabary
         :let [h (:h syl)]
-        :when (and h (not (contains? "ん" h)))
-        :let [r (get-first syl :ks :r)
+        :when (and h (not (not= "ん" h)))
+        :let [r (get-first syl :r :ks)
               h' (str h "ー")
               k (str (:k syl) "ー")]]
-    (assoc syl :h h' :k k :ks (str r (last r)))))
+    (assoc syl :h h' :k k :r (str r (last r)))))
 
 (defonce sym-syl
   (concatv (for [syl (concat syllabary doubled-consonants long-vowels)
                  :when (:h syl)] 
-    (let [syl' (assoc syl :ks (get-first syl :ks :r))]
+    (let [syl' (assoc syl :ks (get-first syl :r :ks))]
       [[(:h syl') syl'] [(:k syl') syl']]))))
 
 (defonce map->syl (into {} sym-syl))
@@ -321,3 +318,7 @@
        (t/tokenize trie->sym)
        (get-map :ks map->syl) 
        (apply str)))
+
+(defn -main []
+  (pprint/pprint trie->sym)
+  (pprint/pprint map->syl))
