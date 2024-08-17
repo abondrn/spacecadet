@@ -45,9 +45,12 @@
                   50 "ごじゅっぷん"
                   55 "ごじゅうご ふん"})
 
-(defonce DIGITS ["ぜろ" "いち" "に" "さん" "よん" "ご" "ろく" "なな" "はち" "きゅう"])
+(defonce DIGITS ["ゼロ" "いち" "に" "さん" "よん" "ご" "ろく" "なな" "はち" "きゅう"])
 
 (defmulti jnumber identity)
+
+(defmethod jnumber "number" [u n]
+  (str (jnumber :default n) "ばん"))
 
 (defmethod jnumber "hours" [u n]
   (str
@@ -115,7 +118,7 @@
 ; 5. counter for fields or rice paddies​
 ; 6. counter for palanquin bearers
 (defmethod jnumber "枚" [u n]
-  (str (jnumber "*" n) "まい"))
+  (str (jnumber :default n) "まい"))
 
 (defn get-place [n x]
   (mod (quot x (math/pow 10 n)) 10))
@@ -134,18 +137,22 @@
 (defn ord [n]
   (case n 0 "zeroth" 1 "first" 2 "second" 3 "third" 4 "fourth" 5 "fifth" 6 "sixth" 7 "seventh" 8 "eighth" 9 "ninth"))
 
+(defn num-terms []
+  (concat
+   (for [u ["d" "c" "k" "10k"]
+         n (range 1 10)
+         :let [base (get ["ten" "twenty" "thirty" "fourty" "fifty" "sixty" "seventy" "eighty" "ninety"] (dec n))]]
+     {:eng (case u "d" base "c" (str n " hundred") "k" (str n " thousand") "10k" (str base " thousand"))
+      :hir (jnumber u n)})
+   (for [u ["本" "つ" "枚"]
+         n (range 1 11)]
+     {:eng (str n " " (case u "本" "poles" "つ" "things" "枚" "sheets")) :hir (jnumber u n)})
+   (for [f (range 1 7)]
+     {:eng (str (ord f) " floor") :hir (jnumber "階" f)})
+   (for [m (range 5 60 5)]
+     {:eng (str m " minutes") :hir (jnumber "minutes" m)})
+   (for [h (range 1 13 1)]
+     {:eng (str h " o'clock") :hir (jnumber "hours" h)})))
+
 (defn -main []
-  (print (str/join "\n" (map (fn [[eng jap]] (str eng "," (k/romanize jap))) (concat
-                                                  (for [u ["d" "c" "k" "10k"]
-                                                        n (range 1 10)
-                                                        :let [base (get ["ten" "twenty" "thirty" "fourty" "fifty" "sixty" "seventy" "eighty" "ninety"] (dec n))]]
-                                                    [(case u "d" base "c" (str n " hundred") "k" (str n " thousand") "10k" (str base " thousand")) (jnumber u n)])
-                                                  (for [u ["本" "つ" "枚"]
-                                                        n (range 1 11)]
-                                                    [(str n " " (case u "本" "poles" "つ" "things" "枚" "sheets")) (jnumber u n)])
-                                                  (for [f (range 1 7)]
-                                                    [(str (ord f) " floor") (jnumber "階" f)])
-                                                  (for [m (range 5 60 5)]
-                                                    [(str m " minutes") (jnumber "minutes" m)])
-                                                  (for [h (range 1 13 1)]
-                                                    [(str h " o'clock") (jnumber "hours" h)]))))))
+  (print (str/join "\n" (map (fn [term] (str (:eng term) "," (k/romanize (:hir term)))) (num-terms)))))
