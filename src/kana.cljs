@@ -288,21 +288,23 @@
               k (str "ッ" (:k syl))]]
     (assoc syl :h h' :k k :r (str (first r) r))))
 
-; TODO fix entries for hiragana
+(defonce kata-skip (set "ンヿ"))
+
 (defonce long-vowels
   (for [syl syllabary
-        :let [h (:h syl)]
-        :when (and h (not (not= "ん" h)))
+        :let [k (:k syl)]
+        :when (and k (not (kata-skip k)))
         :let [r (get-first syl :r :ks)
-              h' (str h "ー")
-              k (str (:k syl) "ー")]]
-    (assoc syl :h h' :k k :r (str r (last r)))))
+              k (str k "ー")]]
+    {:k k :r (str r (last r))}))
 
 (defonce sym-syl
   (concatv (for [syl (concat syllabary doubled-consonants long-vowels)
-                 :when (:h syl)] 
+                 :when (:k syl)] 
     (let [syl' (assoc syl :ks (get-first syl :r :ks))]
-      [[(:h syl') syl'] [(:k syl') syl']]))))
+      (if (:h syl')
+        [[(:h syl') syl'] [(:k syl') syl']]
+        [[(:k syl') syl']])))))
 
 (defonce map->syl (into {} sym-syl))
 (defonce trie->sym (t/build-trie (keys map->syl)))
