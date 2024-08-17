@@ -5,6 +5,8 @@
    [clojure.pprint :as pprint]
    [clojure.string :as str]
    
+   ["node:fs" :as fs]
+   ["node:fs/promises" :as fsPromises]
    ["unofficial-jisho-api$default" :as JoshiAPI]))
 
 (defonce j (new JoshiAPI))
@@ -28,6 +30,23 @@
         res
         (p/recur (into res data) (inc page))))))
 
+(defn write-json [path data]
+  (->> data clj->js js/JSON.stringify (fsPromises/writeFile path)))
+
+(defn read-json [path]
+  (p/let [json (fsPromises/readFile path)]
+    (js->clj (js/JSON.parse json))))
+
+(defn json-cached [path fn]
+  (if (fs/existsSync path)
+    (read-json path)
+    (p/let [res (fn)]
+      (write-json path res)
+      res)))
+
+(defn get-tag [tag]
+  (json-cached (str tag ".json") #(search-phrase-until-page (str "#" tag) nil)))
+
 (defn scrape-phrase
   "Scrape the word page for a word/phrase.
    This allows you to get some information that isn't provided by the official API, such as part-of-speech and JLPT level.
@@ -50,34 +69,74 @@
   (p/let [result (.searchForExamples j phrase)]
     (js->clj result)))
 
-#_(p/let [result (search-phrase-all "paper")]
-  (print (count result)))
-
-#_(p/let [result (scrape-phrase "紙")]
-  (pprint/pprint result))
-
 (defn find [pred coll]
   (first (filter pred coll)))
 
 (defonce WK "wanikani")
 
-; for a given JLPT level, finds the percentage of the vocab covered by each level of Wani Kani
-#_(p/let [result (search-phrase-until-page "#jlpt-n5" nil)
-        wk-levels (for [entry result
-                        :let [level-tag (find #(str/starts-with? % WK) (get entry "tags"))
-                              level-num (if (nil? level-tag) nil (js/parseInt (subs level-tag (count WK))))]]
-                    level-num)
-        wk-counts (reduce (fn [m wanikani-level]
-                            (assoc m wanikani-level (inc (get m wanikani-level 0))))
-                          {}
-                          wk-levels)
-        max-level (apply max (filter some? wk-levels))
-        vocab-size (count result)
-        wk-cumcounts (loop [level 1 already-covered 0 res []]
-                       (if (> level max-level)
-                         res
-                         (recur (inc level)
-                                (+ already-covered (get wk-counts level 0))
-                                (conj res [level (* 100 (/ (+ already-covered (get wk-counts level 0)) vocab-size))]))))
-        ]
-  (pprint/pprint wk-cumcounts))
+(defn wanikani-progress
+  "for a set of entries, finds the percentage of the vocab covered by each level of Wani Kani"
+  [entries]
+  (let [wk-levels (for [entry entries
+                          :let [level-tag (find #(str/starts-with? % WK) (get entry "tags"))
+                                level-num (if (nil? level-tag) nil (js/parseInt (subs level-tag (count WK))))]]
+                      level-num)
+          wk-counts (frequencies wk-levels)
+          max-level (apply max (filter some? wk-levels))
+          vocab-size (count entries)
+          wk-cumcounts (loop [level 1 already-covered 0 res []]
+                         (if (> level max-level)
+                           res
+                           (recur (inc level)
+                                  (+ already-covered (get wk-counts level 0))
+                                  (conj res [level (* 100 (/ (+ already-covered (get wk-counts level 0)) vocab-size))]))))]
+    wk-cumcounts))
+
+(defn sense-stats
+  "Computes various summary statistics related to Jisho sense entries"
+  [entries]
+  (let [senses (for [entry entries sense (get entry "senses")] sense)]
+    {:by-pos (frequencies (for [s senses pos (get s "parts_of_speech")] pos))
+     :by-tag (frequencies (for [s senses t (get s "tags")] t))
+     :has-antonyms (count (for [s senses :when (not-empty (get s "antonyms"))] s))
+     :has-restrictions (count (for [s senses :when (not-empty (get s "restrictions"))] s))
+     :has-info (count (for [s senses :when (not-empty (get s "info"))] s))
+     :has-see-also (count (for [s senses :when (not-empty (get s "see_also"))] s))
+     :by-lang-source (frequencies (for [sense senses src (get sense "source")] (get src "language")))}))
+
+(defn <=na [a b]
+  (if (or (nil? a) (nil? b))
+    true
+    (<= a b)))
+
+(defn get-terms [tag]
+  (p/let [data (get-tag tag)]
+    (for [entry data
+          :let [level-tag (find #(str/starts-with? % WK) (get entry "tags"))
+                level-num (if (nil? level-tag) nil (js/parseInt (subs level-tag (count WK))))]
+          :when (nil? level-num)]
+      {:eng (for [sense (get entry "senses")
+                  def (get sense "english_definitions")]
+              def)
+       :hir (get-in entry ["japanese" 0 "reading"])
+       :full entry})))
+
+#_(p/let [result (search-phrase-all "paper")]
+    (print (count result)))
+
+#_(p/let [result (scrape-phrase "紙")]
+    (pprint/pprint result))
+
+; TODO configure with CLI args
+(defn -main []
+  (p/let [n4 (get-tag "jlpt-n4")
+          n5 (get-tag "jlpt-n5")
+          data (concat n4 n5)]
+  ;(pprint/pprint (for [entry data sense (get entry "senses") :when (or (not-empty (get sense "restrictions")) (not-empty (get sense "info")))] sense))
+    (pprint/pprint (wanikani-progress data))
+    (pprint/pprint (sense-stats
+                    (for [entry data
+                          :let [level-tag (find #(str/starts-with? % WK) (get entry "tags"))
+                                level-num (if (nil? level-tag) nil (js/parseInt (subs level-tag (count WK))))]
+                          :when (<=na 16 level-num)]
+                      entry)))))
