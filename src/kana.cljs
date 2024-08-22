@@ -1,10 +1,53 @@
 (ns src.kana
-  (:require
-   [src.trie :as t]
+  (:require 
+   [cljs.test :as t :refer [async deftest is testing]] 
+   [clojure.pprint :as pprint]
    
-   [clojure.pprint :as pprint]))
+   [src.trie :as trie]))
+
+; https://en.wiktionary.org/wiki/Appendix:Easily_confused_Japanese_kana
+(defonce similar-looking
+  ["ちらきさ"
+   "おむ"
+   "こてに"
+   "たな"
+   "ぬめ"
+   "ねれわゐ"
+   "るろそ"
+   "はほ"
+   "シツ"
+   "タクケ夕久"
+   "スヌク久"
+   "ンソリり" ; (利)
+   "ウラヲう"
+   "コユつワフ"
+   "アマム"
+   "ナメオ"
+   "ハへヘ"
+   "ヨヲ"
+   "ヤセヒ七匕や也せ世サ"
+   "エ工"
+   "オ才"
+   "カ力か" ; (加)
+   "チ千"
+   "ナ十"
+   "ニ二こ"
+   "ヌ又"
+   "ホ木"
+   "ミ彡"
+   "ロ口"
+   "ハ八"
+   "ー一"
+   "ト卜"
+   "ム厶"
+   "ヨ彐"
+   "しレ"
+   "りク"
+   ])
+;mo: も モ (毛)
 
 ; source: https://github.com/kanasubs/namban/blob/master/src/namban/shocho.cljx
+; origin fields (ho and ko) derived from https://www.sljfaq.org/afaq/originofkana.html
 (defonce syllabary
   [{:y "。" :ry "."} {:y "、" :ry ","} {:y "？" :ry "?"} {:y "！" :ry "!"}
    {:y "　" :ry " "} {:y "ゝ" :ry "ヽ"} {:y "ゞ" :ry "ヾ"} {:y "ー" :ry "-"}
@@ -17,8 +60,11 @@
    ; this is some kind of yakumono, but can't be included above
    {:k "ヿ" :h "ゟ" :r " "}
 
-   {:h "あ" :k "ア" :r "a" :s "ａ" :as "a"} {:h "い" :k "イ" :r "i"}
-   {:h "う" :k "ウ" :r "u"} {:h "え" :k "エ" :r "e" :as "e"} {:h "お" :k "オ" :r "o"}
+   {:h "あ" :k "ア" :r "a" :ho "安" :ko "阿" :s "ａ" :as "a"}
+   {:h "い" :k "イ" :r "i" :ho "以" :ko "伊"}
+   {:h "う" :k "ウ" :r "u" :ho "宇" :ko "宇"}
+   {:h "え" :k "エ" :r "e" :ho "衣" :ko "衣" :as "e"}
+   {:h "お" :k "オ" :r "o" :ho "於" :ko "於"}
 
    ; numbers go after {:h "あ" :k "ア" :r "a" :s "ａ" :as "a"}
    {:s "０" :as "0"} {:s "１" :as "1"} {:s "２" :as "2"} {:s "３" :as "3"}
@@ -30,7 +76,7 @@
 
    ; TODO support wapuro -/nn
    ;{:h "ん" :k "ン" :r "n'"}
-   {:h "ん" :k "ン" :r "n"} ; n => ん/ン
+   {:h "ん" :k "ン" :r "n" :ho "毛无" :ko "尓爾"} ; n => ん/ン
    ;{:h "ん" :k "ン" :r "n-" :ks "n'"} ; n- => ん/ン/n'
    ;{:h "ん" :k "ン" :r "m" :ks "n"} ; m => n/ん/ン
 
@@ -41,32 +87,56 @@
     ;   - https://en.wikipedia.org/wiki/Hepburn_romanization
     ;   - https://en.wikipedia.org/wiki/Kunrei-shiki_romanization
     ; gojūon
-   {:h "か" :k "カ" :r "ka"} {:h "き" :k "キ" :r "ki"} {:h "く" :k "ク" :r "ku"}
-   {:h "け" :k "ケ" :r "ke"} {:h "こ" :k "コ" :r "ko"}
+   {:h "か" :k "カ" :r "ka" :ko "加" :ho "加"}
+   {:h "き" :k "キ" :r "ki" :ko "幾" :ho "幾"}
+   {:h "く" :k "ク" :r "ku" :ko "久" :ho "久"}
+   {:h "け" :k "ケ" :r "ke" :ko "介" :ho "計"}
+   {:h "こ" :k "コ" :r "ko" :ko "己" :ho "己"}
 
-   {:h "さ" :k "サ" :r "sa"} {:h "し" :k "シ" :r "shi" :ks "si"}
-   {:h "す" :k "ス" :r "su"} {:h "せ" :k "セ" :r "se"} {:h "そ" :k "ソ" :r "so"}
+   {:h "さ" :k "サ" :r "sa"  :ho "左" :ko "散"}
+   {:h "し" :k "シ" :r "shi" :ho "之" :ko "之" :ks "si"}
+   {:h "す" :k "ス" :r "su"  :ho "寸" :ko "須"}
+   {:h "せ" :k "セ" :r "se"  :ho "世" :ko "世"}
+   {:h "そ" :k "ソ" :r "so"  :ho "會" :ko "會"}
 
-   {:h "た" :k "タ" :r "ta"} {:h "ち" :k "チ" :r "chi" :ks "ti"}
-   {:h "つ" :k "ツ" :r "tsu" :ks "tu"} {:h "て" :k "テ" :r "te"}
-   {:h "と" :k "ト" :r "to"}
+   {:h "た" :k "タ" :r "ta"  :ho "太" :ko "多"}
+   {:h "ち" :k "チ" :r "chi" :ho "知" :ko "千" :ks "ti"}
+   {:h "つ" :k "ツ" :r "tsu" :ho "州" :ko "州" :ks "tu"}
+   {:h "て" :k "テ" :r "te"  :ho "天" :ko "天"}
+   {:h "と" :k "ト" :r "to"  :ho "止" :ko "止"}
 
-   {:h "な" :k "ナ" :r "na"} {:h "に" :k "ニ" :r "ni"} {:h "ぬ" :k "ヌ" :r "nu"}
-   {:h "ね" :k "ネ" :r "ne"} {:h "の" :k "ノ" :r "no"}
+   {:h "な" :k "ナ" :r "na" :ho "奈" :ko "奈"}
+   {:h "に" :k "ニ" :r "ni" :ho "仁" :ko "二"}
+   {:h "ぬ" :k "ヌ" :r "nu" :ho "奴" :ko "奴"}
+   {:h "ね" :k "ネ" :r "ne" :ho "祢" :ko "祢"}
+   {:h "の" :k "ノ" :r "no" :ho "乃" :ko "乃"}
 
-   {:h "は" :k "ハ" :r "ha"} {:h "ひ" :k "ヒ" :r "hi"}
-   {:h "ふ" :k "フ" :r "fu" :ks "hu"} {:h "へ" :k "ヘ" :r "he"}
-   {:h "ほ" :k "ホ" :r "ho"}
+   {:h "は" :k "ハ" :r "ha" :ho "波" :ko "八"}
+   {:h "ひ" :k "ヒ" :r "hi" :ho "比" :ko "比"}
+   {:h "ふ" :k "フ" :r "fu" :ho "不" :ko "不" :ks "hu"}
+   {:h "へ" :k "ヘ" :r "he" :ho "部" :ko "部"}
+   {:h "ほ" :k "ホ" :r "ho" :ho "保" :ko "保"}
 
-   {:h "ま" :k "マ" :r "ma"} {:h "み" :k "ミ" :r "mi"} {:h "む" :k "ム" :r "mu"}
-   {:h "め" :k "メ" :r "me"} {:h "も" :k "モ" :r "mo"}
+   {:h "ま" :k "マ" :r "ma" :ho "末" :ko "万末"}
+   {:h "み" :k "ミ" :r "mi" :ho "美" :ko "三"}
+   {:h "む" :k "ム" :r "mu" :ho "武" :ko "牟"}
+   {:h "め" :k "メ" :r "me" :ho "女" :ko "女"}
+   {:h "も" :k "モ" :r "mo" :ho "毛" :ko "毛"}
 
-   {:h "や" :k "ヤ" :r "ya"} {:h "ゆ" :k "ユ" :r "yu"} {:h "よ" :k "ヨ" :r "yo"}
-   {:h "ら" :k "ラ" :r "ra"} {:h "り" :k "リ" :r "ri"} {:h "る" :k "ル" :r "ru"}
-   {:h "れ" :k "レ" :r "re"} {:h "ろ" :k "ロ" :r "ro"}
+   {:h "や" :k "ヤ" :r "ya" :ho "也" :ko "也"}
+   {:h "ゆ" :k "ユ" :r "yu" :ho "由" :ko "由"}
+   {:h "よ" :k "ヨ" :r "yo" :ho "与" :ko "与"}
 
-   {:h "わ" :k "ワ" :r "wa"} {:h "ゐ" :k "ヰ" :r "wi" :ks "i"}
-   {:h "ゑ" :k "ヱ" :r "we" :ks "e"} {:h "を" :k "ヲ" :r "o" :ks "o"}
+   {:h "ら" :k "ラ" :r "ra" :ho "良" :ko "良"}
+   {:h "り" :k "リ" :r "ri" :ho "利" :ko "利"}
+   {:h "る" :k "ル" :r "ru" :ho "留" :ko "留"}
+   {:h "れ" :k "レ" :r "re" :ho "礼" :ko "流礼"}
+   {:h "ろ" :k "ロ" :r "ro" :ho "呂" :ko "呂"}
+
+   {:h "わ" :k "ワ" :r "wa" :ho "和" :ko "和"}
+   {:h "ゐ" :k "ヰ" :r "wi" :ho "為" :ko "井" :ks "i"}
+   {:h "ゑ" :k "ヱ" :r "we" :ho "恵" :ko "慧恵" :ks "e"}
+   {:h "を" :k "ヲ" :r "o"  :ho "遠" :ko "乎" :ks "o"}
 
     ; dakuten no gojūon
    {:h "が" :k "ガ" :r "ga"} {:h "ぎ" :k "ギ" :r "gi"} {:h "ぐ" :k "グ" :r "gu"}
@@ -235,7 +305,7 @@
 
    {:ks "gwa" :h "ぐゎ" :k "グヮ"}
 
-   {:ks "wo" :h "を" :k "ヲ" :r "o"}
+   {:ks "wo" :h "を" :k "ヲ" :r "o" :ho "" :ko ""}
 
     ; ヶ choose from below which version to use, according to use frequency
     ;{:k "ヶ" :h "か" :r "ka"} ; for counter - tatoeba 一ヶ月
@@ -291,7 +361,7 @@
 (defonce kata-skip (set "ンヿ"))
 
 (defonce long-vowels
-  (for [syl syllabary
+  (for [syl (concat syllabary doubled-consonants)
         :let [k (:k syl)]
         :when (and k (not (kata-skip k)))
         :let [r (get-first syl :r :ks)
@@ -301,13 +371,13 @@
 (defonce sym-syl
   (concatv (for [syl (concat syllabary doubled-consonants long-vowels)
                  :when (:k syl)] 
-    (let [syl' (assoc syl :ks (get-first syl :r :ks))]
+    (let [syl' (assoc syl :ks (get-first syl :r :ks))] 
       (if (:h syl')
         [[(:h syl') syl'] [(:k syl') syl']]
         [[(:k syl') syl']])))))
 
 (defonce map->syl (into {} sym-syl))
-(defonce trie->sym (t/build-trie (keys map->syl)))
+(defonce trie->sym (trie/build-trie (keys map->syl)))
 
 (defn get-map [f coll seq]
   (for [x seq]
@@ -317,10 +387,15 @@
 
 (defn romanize [txt]
   (->> txt
-       (t/tokenize trie->sym)
+       (trie/tokenize trie->sym)
        (get-map :ks map->syl) 
        (apply str)))
 
+(deftest test-romanize
+  (testing "doubled consonants and vowel extension for katakana"
+    (is (= "happiiawaa" (romanize "ハッピーアワー")))))
+
 (defn -main []
   (pprint/pprint trie->sym)
-  (pprint/pprint map->syl))
+  (pprint/pprint map->syl)
+  (t/run-tests 'src.kana))
