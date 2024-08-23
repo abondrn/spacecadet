@@ -145,6 +145,7 @@
   (let [jtime (rand-time)]
     (quiz-loop (:rom jtime) (str "Translate to Japanese: " (:eng jtime)))))
 
+; TODO: check duplicates
 (defn quiz-terms [terms]
   (fn []
     (let [questions (for [obj terms
@@ -348,33 +349,121 @@
 
 (defonce VERBS
   [{:eng "go" :hir "いく"}
-   {:eng "come" :hir "くる"}])
+   {:eng "come" :hir "くる" :n 5}])
 
 (defonce quiz-expressions
   (quiz-terms
     [{:eng ["have a good trip" "have a good day"] :hir "いってらっしゃい"}
      {:eng "nice to meet you" :hir "はじめまして"}
-     {:eng ["it was a pleasure" "nice to meet you" "thank you for your time"] :hir "よろしく おねがいします" :info "usually combined with はじめまし て. It is also used when taking one’s leave after having asked a favor. よろしく means “well” and is used as a request for the other person’s favorable consideration in the future."}
+     {:eng ["it was an honor" "nice to meet you" "thank you for your time"] :hir "よろしく おねがいします" :info "usually combined with はじめまし て. It is also used when taking one’s leave after having asked a favor. よろしく means “well” and is used as a request for the other person’s favorable consideration in the future."}
      {:eng "good morning" :hir "おはようございます"}
-     {:eng "goodbye" :hir "しつれいします" :info "a form of “good-bye” when hanging up the phone or leaving a house or room. It is also used when entering a house or room, passing in front of someone, leaving in the middle of a gathering, and so on, to mean “excuse me.”"}
+     {:eng ["goodbye" "I must go now" "I'm off"] :hir "しつれいします" :info "a form of “good-bye” when hanging up the phone or leaving a house or room. It is also used when entering a house or room, passing in front of someone, leaving in the middle of a gathering, and so on, to mean “excuse me.”"}
 
      {:eng "that's right" :hir "そうです"}
      {:eng ["I see" "is that so"] :hir "そうですか"} ; spoken with falling intonation
      {:eng "same here" :hir "こちらこそ"}
      {:eng "where are you from?" :hir "おくには どちらですか"}
      {:eng ["idk" "I don't know"] :hir "わかりません"}
-     {:eng "thank you" :hir "ありがとうございます"}
-     {:eng "thank you very much" :hir "どうも ありがとうございます"}
-     {:eng "thanks" :hir "ありがとう"}
-     {:eng "thanks so much" :hir "どうも ありが とう"}
+     {:eng "thank you" :hir "ありがとうございます" :f :polite}
+     {:eng "thank you very much" :hir "どうも ありがとうございます" :f :polite}
+     {:eng "thanks" :hir "ありがとう" :f :casual}
+     {:eng "thanks so much" :hir "どうも ありが とう" :f :casual}
      {:eng "please tell me" :hir "〜を おしえてください"}
-     {:eng "one more time please" :hir "もう いちど おねがいします"}
+     {:eng "one more time please" :hir "もう いちど おねがいします" :f :polite}
 
      {:eng ["last order" "last call"] :kat "ラストオーダー"}
      {:eng ["may I help you" "welcome"] :hir "いらっしゃいませ"}
      {:eng ["please show me" "may I see"] :hir "みせてください"}
 
      {:eng "alone" :hir "ひとりで"}
+
+     ; question words: https://guidetojapanese.org/learn/complete/questionwords
+     {:eng "who" :hir "だれ" :kan "誰" :info "attach の to ask whose"}
+     {:eng "what" :hir ["なに" "なん"] :kan "何"}
+     ;どうして – why
+     ;なんで – why (casual)
+     ;なぜ – why (formal)
+     {:eng "how many" :hir "いくつ"}
+     {:eng "how much" :hir "いくら"}
+
+     ; The following question words can be used with 「も」 to include and/or exclude everything.
+     ;誰も 【だれ・も】 – everybody or nobody when used with negative, (N5)
+     ;何も 【なに・も】 – nothing/not anything/not any kind of when used with negative (N5)
+     ;どこも – everywhere or nowhere when used with negative (N5)
+     ;どうしても – no matter what
+     ;どちらも – both ways
+     ;いつも – always
+     ; Things aren’t as consistent as one would hope however. For example, 「何も」 is usually not used to mean “everything”. And 「いつも」 always means “always” for both positive and negative forms. Other words can be used instead to express similar concepts.
+     ;皆 【みんな】 – everybody
+     ;皆さん 【みな・さん】 – everybody (polite)
+     ;全部 【ぜん・ぶ】 – everything
+     ;全然　【ぜん・ぜん】 – not at all (when used with negative)
+     ;絶対 【ぜっ・たい】 – absolutely, unconditionally or never when used with negative
+
+     ; The combination of two particles 「でも」 can be used with question words to indicate “any”.
+     {:eng "anybody" :hir "だれ・でも" :kan "誰でも"}
+     {:eng "anything" :hir "なん・でも" :kan "何でも"}
+     {:eng "anywhere" :hir "どこでも"}
+     {:eng "any amount" :hir "いくらでも"}
+     {:eng "anyhow" :hir "どうでも"}
+     {:eng "any way" :hir "どちらでも"}
+     {:eng "any time" :hir "いつでも"}
+     {:eng "any number of things" :hir "いくつでも"}
+
+     ; The question marker can also be used with some question words to indicate “some”.
+     {:eng ["somebody" "someone"] :hir "だれ・か" :kan "誰か" :n 5}
+     {:eng ["something" "some kind of"] :hir "なに・か" :kan "何か" :n 5}
+     ;どうしてか – for some reason
+     ;なんでか – for some reason (casual)
+     ;なぜか – for some reason (formal)
+     {:eng "somewhere" :hir "どこか" :n 5}
+     {:eng "some amount" :hir "いくらか"}
+     {:eng "somehow" :hir "どうか"}
+     {:eng "one way (of the two)" :hir "どちらか"}
+     {:eng "sometime" :hir "いつか"}
+     {:eng "some number of things" :hir "いくつか"}
+
+     {:eng ["very" "too much"] :hir "すぎる" :n 5}
+     {:eng ["quite" "rather" "fairly"] :hir "けっこう" :n 5}
+     {:eng ["many" "a lot of" "plenty" "enough"] :hir "たくさん" :n 5}
+     {:eng ["only" "just"] :hir "だけ" :n 5}
+     {:eng ["still" "not yet"] :hir "まだ" :n 5}
+     {:eng ["already" "anymore"] :hir "もう" :n 5}
+
+     {:eng "and" :hir "と" :n 5}
+     {:eng ["also" "too" "as well" "even" "either" "neither"] :hir "も" :n 5}
+     {:eng "or" :hir "か" :n 5}
+     {:eng ["things like" "and the like"] :hir "や" :n 5}
+     {:eng "with" :hir "と" :n 5}
+     {:eng ["because" "so" "since" "the reason being"] :hir "ので" :n 5}
+     {:eng ["because" "so" "since" "the reason being" "from"] :hir "から" :n 5}
+     {:eng ["before" "in front of"] :hir "まえに" :n 5}
+     {:eng ["but" "although"] :hir "けれども" :n 5}
+     {:eng ["but" "however"] :hir "けど" :n 5}
+     {:eng ["but" "however"] :hir "だけど" :n 5}
+     {:eng ["but" "however"] :hir "が" :n 5}
+     {:eng ["after doing" "and once that's done" "and afte that" "and once that happens"] :hir "てから" :n 5}
+
+     {:eng ["is alright" "is fine" "is okay even if" "can" "may" "is also okay"] :hir "てもいい" :n 5}
+     {:eng ["must do" "have to do"] :hir "なくてはいけない" :n 5}
+     {:eng ["must do" "have to do"] :hir "なくてはならない" :n 5}
+     {:eng ["must not" "may not"] :hir "てはいけない" :n 5}
+     {:eng ["should do" "it'd be better to"] :hir "たほうがいい" :n 5}
+     {:eng ["shouldn't do" "it'd be better not to"] :hir "ないほうがいい" :n 5}
+     {:eng ["must do" "have to do"] :hir "なくちゃ・なきゃ" :n 5}
+     {:eng ["want to do"] :hir "たい" :n 5}
+     {:eng ["like doing" "love doing"] :hir "のがすき" :n 5}
+     {:eng ["like" "fond of"] :hir "好き" :n 5}
+     {:eng ["dislike" "not fond of"] :hir "きらい" :n 5}
+     {:eng "have done before" :hir "たことがある" :n 5}
+     {:eng ["won't you" "would you not" "why don't we"] :hir "ませんか" :n 5}
+
+     ; requests
+     {:eng ["please do"] :hir "てください" :f :polite :n 5}
+     {:eng ["please don't"] :hir "ないでください" :f :polite :n 5}
+
+     {:eng ["isn't it?" "right?"] :hir "ね" :n 5 :pos :sentence-ending-particle}
+     {:eng ["definitely" "for sure"] :hir "よ" :n 5 :pos :sentence-ending-particle :info "emphasis"}
 
      {:eng "well then" :hir "じゃ"}
      {:eng "no" :hir "いいえ"}
@@ -383,6 +472,12 @@
      {:eng ["yep" "yes"] :hir "ええ" :info "a softer way of saying はい"}
      {:eng ["uhh" "um"] :hir "さあ" :info "expresses the speaker’s hesitation about immediately answering"}
      {:eng "well then" :hir "では"}]))
+
+(defonce PREFIXES
+  [])
+
+(defonce SUFFIXES
+  [])
 
 (defn quiz-jisho-tag [tag]
   (fn []
