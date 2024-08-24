@@ -145,8 +145,22 @@
   (let [jtime (rand-time)]
     (quiz-loop (:rom jtime) (str "Translate to Japanese: " (:eng jtime)))))
 
-; TODO: check duplicates
+(defn dups
+  [f seq]
+  (->> seq
+       (group-by f)
+       ; filter out map entries where its value has only 1 item 
+       (remove #(or (nil? (key %)) (= 1 (count (val %)))))))
+
 (defn quiz-terms [terms]
+  (let [hir-dups (dups :hir terms)
+        eng-dups (dups :eng terms)]
+    (when (not-empty hir-dups)
+      (print "Duplicates found: ")
+      (pprint/pprint hir-dups))
+    (when (not-empty eng-dups)
+      (print "Duplicates found: ")
+      (pprint/pprint eng-dups)))
   (fn []
     (let [questions (for [obj terms
                           :let [eng (:eng obj)
@@ -241,8 +255,6 @@
     {:eng "last year" :hir "きょねん"}
     {:eng "this year" :hir "ことし"}
     {:eng "next year" :hir "らいねん"}
-    
-    {:eng "Friday" :hir "きんようび"}
     
     {:eng "lunchtime" :kat "ラチタイム"}
     {:eng "lunch break" :hir "ひるやすみ"}
@@ -462,18 +474,38 @@
      {:eng "sometime" :hir "いつか"}
      {:eng "some number of things" :hir "いくつか"}
 
+     ; extent
      {:eng ["very" "too much"] :hir "すぎる" :n 5}
-     {:eng ["quite" "rather" "fairly"] :hir "けっこう" :n 5}
+     {:eng ["quite" "rather" "fairly"] :hir "けっこう" :n 5} 
+     {:eng ["completely" "exactly" "right"] :kan "真" :hir "っ" :n 4}
+     {:eng ["(not) at all"] :hir "ぜんぜん" :n 4}
+     {:eng ["hardly possible" "cannot be" "highly unlikely" "improbable"] :hir "はずがない" :n 4}
+     {:eng ["might" "maybe" "probably"] :hir "かもしれない" :n 4}
+
+     ; qualifiers
+     {:eng ["almost all" "most" "hardly any" "few"] :pos :adverbial-noun :hir "ほとんど" :n 4}
      {:eng ["many" "a lot of" "plenty" "enough"] :hir "たくさん" :n 5}
      {:eng ["only" "just"] :hir "だけ" :n 5}
      {:eng ["still" "not yet"] :hir "まだ" :n 5}
-     {:eng ["already" "anymore"] :hir "もう" :n 5}
+     {:eng ["already" "anymore"] :hir "もう" :n 5} 
+     {:eng ["gradually" "little by little" "step by step"] :hir "だんだん" :n 4}
+     {:eng ["progressively" "rapidly increasing" "more and more"] :hir "どんどん" :n 4} 
+     {:eng ["just by" "just with"] :hir "だけで" :n 4}
+     {:eng ["around" "about"] :hir "ごろ" :n 4}
+     {:eng ["most" "mostly" "adequately" "generally" "for the most part" "roughly" "approximately" "in the first place"] :hir "だいたい" :n 4}
+     {:eng ["less than (or equal to)" "under" "blow" "any less" "fewer" "not exceeding"] :hir "いか" :n 4}
+     {:eng ["except" "besides" "other than" "with the exception of"] :hir "いがい" :n 4}
+     {:eng ["each" "every" "respective" "various"] :hir "各" :n 4}
+     {:eng ["each" "every" "at intervals of"] :hir "ごとに" :n 4}
+     {:eng ["more than" "over"] :hir "より" :n 4}
 
-     {:eng "and" :hir "と" :n 5}
-     {:eng ["also" "too" "as well" "even" "either" "neither"] :hir "も" :n 5}
-     {:eng "or" :hir "か" :n 5}
-     {:eng ["things like" "and the like"] :hir "や" :n 5}
-     {:eng "with" :hir "と" :n 5}
+     ; event sequence
+     {:eng ["after" "later"] :hir "あとで" :n 4}
+     {:eng ["when" "from when" "just when" "if"] :hir "たら" :n 4}
+     {:eng ["while" "during" "as" "in the process of"] :hir "ながら" :n 4}
+     {:eng ["just did" "something just happened"] :hir "たばかり" :n 4}
+
+     ; connectors (particles etc) 
      {:eng ["because" "so" "since" "the reason being"] :hir "ので" :n 5}
      {:eng ["because" "so" "since" "the reason being" "from"] :hir "から" :n 5}
      {:eng ["before" "in front of"] :hir "まえに" :n 5}
@@ -481,8 +513,36 @@
      {:eng ["but" "however"] :hir "けど" :n 5}
      {:eng ["but" "however"] :hir "だけど" :n 5}
      {:eng ["but" "however"] :hir "が" :n 5}
-     {:eng ["after doing" "and once that's done" "and afte that" "and once that happens"] :hir "てから" :n 5}
+     {:eng ["but" "still" "however" "nevertheless"] :hir "だが" :n 4}
+     {:eng ["but" "still" "however" "nevertheless"] :hir "ですが" :n 4}
+     {:eng ["so that" "in order to" "in such a way that"] :hir "ように" :n 4} 
+     {:eng ["because of that" "so?" "and then?" "therefore" "with that"] :hir "それで" :n 4}
+     {:eng ["but still" "and yet" "even so" "nevertheless"] :hir "それでも" :n 4}
+     {:eng ["in" "among" "within"] :hir "のなかで" :n 4}
+     {:eng ["in the event of" "in the case of"] :hir "ばあいは" :n 4}
+     {:eng ["when" "at the time of"] :hir "とき" :n 4}
+     {:eng ["even" "to even" "to the extent of"] :hir "まで" :n 4}
+     {:eng ["by" "by the time that" "before"] :hir "までに" :n 4} 
+     {:eng ["even if" "even though"] :hir "ても" :n 4}
+     {:eng ["despite" "although" "even though"] :hir "のに" :n 4}
 
+     ; lists, conjunctions
+     {:eng "and" :hir "と" :n 5}
+     {:eng ["also" "too" "as well" "even" "either" "neither"] :hir "も" :n 5}
+     {:eng "or" :hir "か" :n 5}
+     {:eng ["things like" "and the like"] :hir "や" :n 5}
+     {:eng "with" :hir "と" :n 5}
+     {:eng ["also" "as well" "moreover" "again" "additionally"] :hir "また" :n 4}
+     {:eng ["among other things" "for example" "such as"] :hir "とか" :n 4}
+
+     ; sequencing connectors
+     {:eng ["after doing" "and once that's done" "and after that" "and once that happens"] :hir "てから" :n 5} 
+     {:eng ["and" "besides" "moreover" "in addition"] :hir "それに" :n 4}
+     {:eng ["to start with" "firstly"] :hir "まず" :n 4}
+     {:eng ["for example"] :hir "たとえば" :n 4}
+     {:eng ["finally" "after all"] :hir "とうとう" :n 4}
+
+     ; qualifiers (adverbs etc)
      {:eng ["is alright" "is fine" "is okay even if" "can" "may" "is also okay"] :hir "てもいい" :n 5}
      {:eng ["must do" "have to do"] :hir "なくてはいけない" :n 5}
      {:eng ["must do" "have to do"] :hir "なくてはならない" :n 5}
@@ -492,11 +552,21 @@
      {:eng ["must do" "have to do"] :hir "なくちゃ・なきゃ" :n 5}
      {:eng ["want to do"] :hir "たい" :n 5}
      {:eng ["like doing" "love doing"] :hir "のがすき" :n 5}
-     {:eng ["like" "fond of"] :hir "好き" :n 5}
+     {:eng ["like" "fond of"] :kat "好き" :n 5}
      {:eng ["dislike" "not fond of"] :hir "きらい" :n 5}
      {:eng "have done before" :hir "たことがある" :n 5}
      {:eng ["won't you" "would you not" "why don't we"] :hir "ませんか" :n 5}
-
+     {:eng ["don't have to"] :hir "なくてもいい" :n 4}
+     {:eng ["I think"] :hir "とおもう" :n 4}
+     {:eng ["you could say" "you might say"] :hir "といってもいい" :n 4}
+     {:eng ["I'm sorry for"] :hir "てすみません" :n 4}
+     {:eng ["I hope" "I wish" "you should" "it would be good"] :hir "といい" :n 4}
+     {:eng ["on the verge of" "about to"] :hir "るところだ" :n 4}
+     {:eng ["easy to" "likely to"] :hir "やすい" :n 4}
+     {:eng ["difficult to" "hard to"] :hir "にくい" :n 4}
+     {:eng ["need" "necessary"] :hir "がひつよう" :n 4}
+     {:eng ["why don't you" "what if you did"] :hir "たらどう" :n 4}
+     
      ; requests
      {:eng ["please do"] :hir "てください" :f :polite :n 5}
      {:eng ["please don't"] :hir "ないでください" :f :polite :n 5}
@@ -504,7 +574,7 @@
      {:eng ["isn't it?" "right?"] :hir "ね" :n 5 :pos :sentence-ending-particle}
      {:eng ["definitely" "for sure"] :hir "よ" :n 5 :pos :sentence-ending-particle :info "emphasis"}
 
-     {:eng "well then" :hir "じゃ"}
+     {:eng ["well then" "okay then"] :hir "じゃ"}
      {:eng "no" :hir "いいえ"}
      {:eng "excuse me" :hir "すみません"}
      {:eng ["ah" "oh"] :hir "あ" :info "utterance expressing having just noticed something. It is also used to get someone’s attention"}
@@ -517,7 +587,10 @@
   [])
 
 (defonce SUFFIXES
-  [])
+  [{:eng ["-ity", "-ness"] :hir "さ" :attaches-to :adj :n 4 :info "converts adjectives to nouns"}
+   {:eng "-ation" :hir "こと" :n 4 :attaches-to :verb :info "converts verbs to nouns"}
+   {:eng ["-style" "way" "fashion"] :kan "風" :n 4 :attaches-to :noun}
+   {:eng ["way of", "how to", "manner of", "method of"] :hir "かた" :n 4 :attaches-to :noun}])
 
 (defn quiz-jisho-tag [tag]
   (fn []
@@ -530,12 +603,13 @@
 (defonce quizzes {"time" quiz-time
                   "phone numbers" quiz-phone
                   "numbers 1-100000" quiz-numbers
-                  "vocab" (quiz-terms (concat OBJECTS PEOPLE LOCATIONS EVENTS))
+                  "vocab" (quiz-terms (concat OBJECTS PEOPLE LOCATIONS EVENTS SUFFIXES))
                   "expressions" quiz-expressions
                   "counters" (quiz-terms (num/num-terms))
                   "JLPT N5 vocab" (quiz-jisho-tag "jlpt-n5")})
 
 ; TODO: fix stats calculation
+; TODO: fix errors when exiting during quiz selection
 (defn -main []
   (println "Press Ctrl+C to exit.")
   ;(.on js/process "SIGINT" handle-sigint)
