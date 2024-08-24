@@ -200,10 +200,6 @@
     {:eng "camera" :kat "カメラ"}
     {:eng "towel" :kat "タオル"}
 
-    {:eng "bus" :kat "バス"}
-    {:eng "airplane" :hir "ひこうき"}
-    {:eng "superexpress train" :hir "しんかんせん"}
-
     {:eng "plate" :hir "さら" :counter "sheets"} ; often used with お
     {:eng "glass" :kat "コップ"}
     {:eng "mug" :kat "マグカップ"}
@@ -267,6 +263,33 @@
     {:eng "pm" :hir "ごご"}
 
     {:eng "now" :hir "いま"}
+
+    {:eng "Sunday" :hir "にちようび"}
+    {:eng "Monday" :hir "げつようび" :lit "moon day"}
+    {:eng "Tuesday" :hir "かようび"}
+    {:eng "Wednesday" :hir "すいようび"}
+    {:eng "Thursday" :hir "もくようび"}
+    {:eng "Friday" :hir "きんようび"}
+    {:eng "Saturday" :hir "どようび"}
+
+    {:eng "January" :hir (num/jnumber "month" 1)}
+    {:eng "February" :hir (num/jnumber "month" 2)}
+    {:eng "March" :hir (num/jnumber "month" 3)}
+    {:eng "April" :hir "しがつ"}
+    {:eng "May" :hir (num/jnumber "month" 5)}
+    {:eng "June" :hir (num/jnumber "month" 6)}
+    {:eng "July" :hir (num/jnumber "month" 7)}
+    {:eng "August" :hir (num/jnumber "month" 8)}
+    {:eng "September" :hir (num/jnumber "month" 9)}
+    {:eng "October" :hir (num/jnumber "month" 10)}
+    {:eng "November" :hir (num/jnumber "month" 11)}
+    {:eng "December" :hir (num/jnumber "month" 12)}
+
+    {:eng "business trip" :hir "しゅっちょう"}
+    {:eng "birthday" :hir "たんじょうび"}
+    {:eng "summer vacation" :hir "なつやすみ"}
+    {:eng "festival" :hir "まつり"} ; used with お
+    {:eng "trip" :hir "りょこう"}
     ])
 
 (defonce LOCATIONS
@@ -289,6 +312,19 @@
    {:eng "first-floor basement" :hir "“ちか いっかい"}
    {:eng "basement" :hir "ちか"}
    {:eng ["bathroom" "restroom"] :hir "おてあらい"}
+   {:eng "hotel" :kat "ホテル"}
+
+   ; means of transportation
+   {:eng "bus" :kat "バス"}
+   {:eng "airplane" :hir "ひこうき"}
+   {:eng "superexpress train" :hir "しんかんせん"}
+   {:eng "train" :hir "でんしゃ"}
+   {:eng "subway" :hir "ちかてつ"}
+   {:eng "car" :hir "くるま"}
+   {:eng "taxi" :kat "タクシー"}
+   {:eng ["motorbike" "motorcycle"] :kat "バイク"}
+   {:eng "bycicle" :hir "じてんしゃ"}
+   {:eng ["on foot" "walking"] :hir "あるいて"}
 
    {:eng "(South) Korea" :hir "かんこく"}
    {:eng "Japan" :hir "にほん"}
@@ -314,7 +350,7 @@
    {:eng "London" :hir "ロンドン"}
    {:eng "Seoul" :hir "ソウル"}
    {:eng "Hong Kong" :kat "ホンコン"}
-   
+
    {:eng "company name" :hir "かいしゃの なまえ"}
    {:eng "address" :hir "じゅうしょ"}
    {:eng "phone number" :hir "でんわばんごう"}
@@ -338,7 +374,9 @@
    {:eng "Hoffman" :kat "ホフマン"}
    {:eng "Brown" :kat "ブラウン"}
    {:eng "Chan" :kat "チャン"}
-   {:eng "Harris" :kat "ハリス"}])
+   {:eng "Harris" :kat "ハリス"}
+   {:eng "Park" :kat "パク"}
+   {:eng "Lopez" :kat "ロペス"}])
 
 (defonce ADJECTIVES
   {:size [{:eng ["big" "large"] :hir "おうきい"}
@@ -349,7 +387,8 @@
 
 (defonce VERBS
   [{:eng "go" :hir "いく"}
-   {:eng "come" :hir "くる" :n 5}])
+   {:eng "come" :hir "くる" :n 5}
+   {:eng ["return" "come back"] :hir "かえります"}])
 
 (defonce quiz-expressions
   (quiz-terms
@@ -471,7 +510,8 @@
      {:eng ["ah" "oh"] :hir "あ" :info "utterance expressing having just noticed something. It is also used to get someone’s attention"}
      {:eng ["yep" "yes"] :hir "ええ" :info "a softer way of saying はい"}
      {:eng ["uhh" "um"] :hir "さあ" :info "expresses the speaker’s hesitation about immediately answering"}
-     {:eng "well then" :hir "では"}]))
+     {:eng "well then" :hir "では"}
+     {:eng "huh" :hir "え" :info "utterance expressing uncertainty about what one has heard. It may be used when one is surprised"}]))
 
 (defonce PREFIXES
   [])

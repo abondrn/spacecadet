@@ -120,6 +120,29 @@
 (defmethod jnumber "枚" [u n]
   (str (jnumber :default n) "まい"))
 
+(defmethod jnumber "year" [u n]
+  (str (jnumber :default n) "ねん"))
+
+(defmethod jnumber "month" [u n]
+  (str (jnumber :default n) "がつ"))
+
+(defmethod jnumber "day" [u n]
+  (case n
+    1 "ついたち"
+    2 "ふつか"
+    3 "みっか"
+    4 "よっか"
+    5 "いつか"
+    6 "むいか"
+    7 "なのか"
+    8 "ようか"
+    9 "ここのか"
+    10 "とおか"
+    14 "じゅうよっか"
+    20 "はつか"
+    24 "にじゅうよっか"
+    :else (str (jnumber :default n) "にち")))
+
 (defn get-place [n x]
   (mod (quot x (math/pow 10 n)) 10))
 
