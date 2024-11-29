@@ -52,14 +52,6 @@
 (defmethod jnumber "number" [u n]
   (str (jnumber :default n) "ばん"))
 
-(defmethod jnumber "hours" [u n]
-  (str
-   (get HOURS (dec n))
-   "じ"))
-
-(defmethod jnumber "minutes" [u n]
-  (get MINUTES n))
-
 (defmethod jnumber "d" [u n]
   (str (if (= 1 n) "" (get DIGITS n)) "じゅう"))
 
@@ -67,14 +59,20 @@
   (get ["ひゃく" "にひゃく" "さんびゃく" "よんひゃく" "ごひゃく" "ろっぴゃく" "ななきゃく" "はっぴゃく" "きゅうひゃく"] (dec n)))
 
 (defmethod jnumber "k" [u n]
-  (get ["せん" "にせん" "さんぜん" "よんせん" "ごせん" "ろくせん" "ななせん" "はっせん" "きゅうせん"] (dec n)))
+  (if (= "?" n)
+    "なんぜん"
+    (get ["せん" "にせん" "さんぜん" "よんせん" "ごせん" "ろくせん" "ななせん" "はっせん" "きゅうせん"] (dec n))))
 
 (defmethod jnumber "10k" [u n]
   (get ["いちまん" "にまん" "さんまん" "よんまん" "ごまん" "ろくまん" "ななまん" "はちまん" "きゅうまん"] (dec n)))
 
 ; counter for long, cylindrical things; counter for films, TV shows, etc.; counter for goals, home runs, etc.; counter for telephone calls
+; TODO: handle numbers larger than 10
 (defmethod jnumber "本" [u n]
   (case n
+    "?" "なんぼん"
+    "*" "まいほん"
+    "各" "かくほん"
     1 "いっぽん"
     2 "にほん"
     3 "さんぼん"
@@ -90,6 +88,7 @@
 ; 箇; 箇: Rarely-used kanji form. 個: Rarely-used kanji form.
 (defmethod jnumber "つ" [u n]
   (case n
+    "?" "いくつ"
     1 "ひとつ"
     2 "ふたつ"
     3 "みっつ"
@@ -99,11 +98,24 @@
     7 "ななつ"
     8 "やっつ"
     9 "ここのつ"
-    10 "とお"))
+    10 "とお"
+    (jnumber :default n)))
+
+(defmethod jnumber "人" [u n]
+  (case n
+    1 "ひとり"
+    2 "ふたり"
+    4 "よにん"
+    (str (jnumber :default n) "にん")))
+
+; 1. counter for people (usu. seating, reservations and such) ​Honorific or respectful (sonkeigo) language
+(defmethod jnumber "名" [u n]
+  (str (jnumber :default n) "めい"))
 
 ; counter for storeys and floors of a building
 (defmethod jnumber "階" [u n]
   (case n
+    "?" "なんかい"
     1 "いっかい"
     2 "にかい"
     3 "さんがい"
@@ -120,11 +132,57 @@
 (defmethod jnumber "枚" [u n]
   (str (jnumber :default n) "まい"))
 
-(defmethod jnumber "year" [u n]
-  (str (jnumber :default n) "ねん"))
+(defmethod jnumber "hour" [u n]
+  (if (= "?" n)
+    "なんじ"
+    (str
+     (get HOURS (dec n))
+     "じ")))
+
+(defmethod jnumber "hours" [u n]
+  (str (jnumber "hour" n) "かん"))
+
+(defmethod jnumber "minute" [u n]
+  (if (= "?" n)
+    "なんぷん"
+    (get MINUTES n)))
+
+(defmethod jnumber "minutes" [u n]
+  (str (jnumber "minute" n) "かん"))
+
+(defmethod jnumber "years" [u n] 
+  (case n
+    "*" "まいとし"
+    4 "よねんかん"
+    (str (jnumber :default n) "ねんかん")))
 
 (defmethod jnumber "month" [u n]
-  (str (jnumber :default n) "がつ"))
+  (str (if (= n 4) "し" (jnumber :default n)) "がつ"))
+
+;　ヶ月
+(defmethod jnumber "months" [u n]
+  (case n
+    "?" "なんかげつ"
+    "*" "まいつき"
+    "各" "かくかげつ" ; TODO: verify
+    1 "いっかげつ"
+    2 "にかげつ"
+    3 "さんかげつ"
+    4 "よんかげつ"
+    5 "ごかげつ"
+    6 "ろっかけつ"
+    7 "ななかげつ"
+    8 "はちかげつ"
+    9 "きゅうかげつ"
+    10 "じゅっかげつ")) 
+
+(defmethod jnumber "weeks" [u n]
+  (case n
+    "*" "まいしゅう"
+    1 "いっしゅうかん"
+    8 "はっしゅうかん"
+    10 "じゅっしゅうかん"
+    (str (jnumber :default n) "しゅうかん")))
 
 (defmethod jnumber "day" [u n]
   (case n
@@ -141,21 +199,32 @@
     14 "じゅうよっか"
     20 "はつか"
     24 "にじゅうよっか"
-    :else (str (jnumber :default n) "にち")))
+    (str (jnumber :default n) "にち")))
+
+(defmethod jnumber "days" [u n]
+  (case n
+    1 "いちにち"
+    (str (jnumber "day" n) "かん")))
 
 (defn get-place [n x]
-  (mod (quot x (math/pow 10 n)) 10))
+  (if (string? n)
+    n
+    (mod (quot x (math/pow 10 n)) 10)))
 
 (defmethod jnumber :default [u n]
-  (str/join " " (for [p (reverse (range 5))
-             :let [place (get-place p n)]
-             :when (not (zero? place))]
-         (case p
-           4 (jnumber "10k" place)
-           3 (jnumber "k" place)
-           2 (jnumber "c" place)
-           1 (jnumber "d" place)
-           0 (get DIGITS place)))))
+  (case n
+    "?" "なん" ; 何 / what / which
+    "*" "まい" ; 毎 / every / all
+    "各" "かく" ; each / respective / various
+    (str/join " " (for [p (reverse (range 5))
+                        :let [place (get-place p n)]
+                        :when (not (zero? place))]
+                    (case p
+                      4 (jnumber "10k" place)
+                      3 (jnumber "k" place)
+                      2 (jnumber "c" place)
+                      1 (jnumber "d" place)
+                      0 (get DIGITS place))))))
 
 (defn ord [n]
   (case n 0 "zeroth" 1 "first" 2 "second" 3 "third" 4 "fourth" 5 "fifth" 6 "sixth" 7 "seventh" 8 "eighth" 9 "ninth"))
@@ -167,15 +236,25 @@
          :let [base (get ["ten" "twenty" "thirty" "fourty" "fifty" "sixty" "seventy" "eighty" "ninety"] (dec n))]]
      {:eng (case u "d" base "c" (str n " hundred") "k" (str n " thousand") "10k" (str base " thousand"))
       :hir (jnumber u n)})
-   (for [u ["本" "つ" "枚"]
-         n (range 1 11)]
-     {:eng (str n " " (case u "本" "poles" "つ" "things" "枚" "sheets")) :hir (jnumber u n)})
+   (for [u ["本"  "枚" "人" "名" "years" "months" "weeks"]
+         n (concat ["?" "*" "各"] (range 1 11))
+         :when (not (and (= "つ" u) (contains? #{"*" "各"} n)))]
+     {:eng (str (case n "?" "how many" "*" "all" "各" "each" n) " " (case u "本" "poles" "つ" "things" "枚" "sheets" "人" "people" "名" "names" u))
+      :hir (jnumber u n)})
    (for [f (range 1 7)]
      {:eng (str (ord f) " floor") :hir (jnumber "階" f)})
    (for [m (range 5 60 5)]
+     {:eng (str m "th minute") :hir (jnumber "minute" m)})
+   (for [m (range 5 60 5)]
      {:eng (str m " minutes") :hir (jnumber "minutes" m)})
-   (for [h (range 1 13 1)]
-     {:eng (str h " o'clock") :hir (jnumber "hours" h)})))
+   (for [h (range 1 25)]
+     {:eng (str h "th day") :hir (jnumber "day" h)})
+   (for [h (range 1 25)]
+     {:eng (str h " days") :hir (jnumber "days" h)})
+   (for [h (range 1 13)]
+     {:eng (str h " o'clock") :hir (jnumber "hour" h)})
+   (for [h (range 1 13)]
+     {:eng (str h " hours") :hir (jnumber "hours" h)})))
 
 (defn -main []
   (print (str/join "\n" (map (fn [term] (str (:eng term) "," (k/romanize (:hir term)))) (num-terms)))))
