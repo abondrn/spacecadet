@@ -305,7 +305,7 @@
 
    {:ks "gwa" :h "ぐゎ" :k "グヮ"}
 
-   {:ks "wo" :h "を" :k "ヲ" :r "o" :ho "" :ko ""}
+   {:ks "wo" :h "を" :k "ヲ" :r "wo" :ho "" :ko ""}
 
     ; ヶ choose from below which version to use, according to use frequency
     ;{:k "ヶ" :h "か" :r "ka"} ; for counter - tatoeba 一ヶ月

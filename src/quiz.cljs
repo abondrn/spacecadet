@@ -14,7 +14,8 @@
 
    [src.kana :as k]
    [src.num :as num]
-   [src.jisho :as jisho]))
+   [src.jisho :as jisho]
+   [src.conjugate :as conjugate]))
 
 (defn am-pm [n]
   (get ["ごぜん" "ごご"] n))
@@ -86,7 +87,6 @@
 
 ; TODO: handle parentheses
 (defn diff-attempt [input answer message]
-  ;(println "\n" input answer)
   (let [raw-diff (diffs input answer)
         stripped-diff (filter ne-change raw-diff)]
     (cond ; no diff
@@ -187,76 +187,25 @@
 (defonce OBJECTS
    [{:eng "business card" :hir "めいし" :counter "sheets"}
     {:eng "umbrella" :hir "かさ" :counter "poles"}
-    {:eng "book" :hir "ほん"}
     {:eng "file" :kat "ファイル" :counter "sheets"}
-    {:eng "glasses" :hir "めがね"}
-    {:eng "smart phone" :kat "スマホ"}
-    {:eng "key" :hir "かぎ"}
-    {:eng "wallet" :hir "さいふ"}
     {:eng "pen" :kat "ペン" :counter "poles"}
     {:eng "ballpoint pen" :kat "ボールペン" :counter "poles"}
     {:eng "mechnical pencil" :kat "シャーペン" :counter "poles"}
-    {:eng "telephone" :hir "でんわ"}
-    {:eng "bag" :hir " かばん"}
-    {:eng ["shopping bag" "sack" "pounch"] :hir "ふくろ" :kan "袋"}
-    {:eng ["watch" "clock"] :hir "とけい"}
     {:eng "(credit) card" :kat "カード" :counter "sheets"}
-    {:eng "television" :kat "テレビ"}
-    {:eng "computer" :kat "パソコン"}
     {:eng "refrigerator" :hir "れいぞうこ" :counter "machines"}
     {:eng "air conditioner" :kat "エアコン" :counter "machines"}
-    {:eng "microwave oven" :hir "でんし れんじ"}
-    {:eng "toaster" :kat "トースター"}
-    {:eng "tablet" :kat "タブレット"}
+    {:eng "tablet" :kat "タブレット" :counter "sheets"}
     {:eng ["T-shirt" "tee"] :kat "T シャツ" :counter "sheets"}
-    {:eng "vacuum (cleaner)" :hir "そうじき"}
-    {:eng "shoes" :hir "くつ"}
-    {:eng "camera" :kat "カメラ"}
-    {:eng "towel" :kat "タオル"}
+    {:eng "towel" :kat "タオル" :counter "sheets"}
 
     {:eng "plate" :hir "さら" :counter "sheets"} ; often used with お
-    {:eng "glass" :kat "コップ"}
-    {:eng "mug" :kat "マグカップ"}
-    {:eng "coffee cup" :kat "コーヒーカップ"}
-    {:eng "apple" :hir "りんご"}
-    {:eng "coffee" :kat "コーヒー"}
-    {:eng "juice" :kat "ジュース"}
-    {:eng "sandwich" :kat "サンドイッチ"}
-    {:eng "(black) tea" :hir "こうちゃ"}
-    {:eng "salad" :kat "サラダ"}
-    {:eng "curry" :kat "カレー"}
-    {:eng "sweets" :hir "かし"}
-    {:eng "orange juice" :kat "オレンジジュース"}
-    {:eng "chocolate cake" :kat "チョコレートケーキ"}
     {:eng "wine" :kat "ワイン" :counter "poles"}
     {:eng "red wine" :kat "あかワイン" :counter "poles"}
     {:eng "white wine" :kat "しろワイン" :counter "poles"}
-    {:eng "beer" :kat "ビール" :counter "poles"}
-    {:eng "beef" :hir "ぎゅうにく"}
-    {:eng "cheese" :kat "チーズ"}
-    {:eng ["orange" "mandarin" "clementine" "satsuma"] :hir "みかん"}
-    {:eng "cheesecake" :kat "チーズケーキ"}])
+    {:eng "beer" :kat "ビール" :counter "poles"}])
 
 (defonce EVENTS
-   [{:eng "day before yesterday" :hir "おととい"}
-    {:eng ["last day" "yesterday"] :hir "きのう"}
-    {:eng ["this day" "today"] :hir "きょう"}
-    {:eng ["next day" "tomorrow"] :hir "あした"}
-    {:eng "day after tomorrow" :hir "あさって"}
-    
-    {:eng "last week" :hir "せんしゅう"}
-    {:eng "this week" :hir "こんしゅう"}
-    {:eng "next week" :hir "らいしゅう"}
-    
-    {:eng "last month" :hir "せんげつ"}
-    {:eng "this month" :hir "こんげつ"}
-    {:eng "next month" :hir "らいげつ"}
-    
-    {:eng "last year" :hir "きょねん"}
-    {:eng "this year" :hir "ことし"}
-    {:eng "next year" :hir "らいねん"}
-    
-    {:eng "lunchtime" :kat "ラチタイム"}
+   [{:eng "lunchtime" :kat "ラチタイム"}
     {:eng "lunch break" :hir "ひるやすみ"}
     {:eng "meeting" :hir "かいぎ"} 
     {:eng "noon" :hir "ひる"}
@@ -273,16 +222,6 @@
 
     {:eng "am" :hir "ごぜん"}
     {:eng "pm" :hir "ごご"}
-
-    {:eng "now" :hir "いま"}
-
-    {:eng "Sunday" :hir "にちようび"}
-    {:eng "Monday" :hir "げつようび" :lit "moon day"}
-    {:eng "Tuesday" :hir "かようび"}
-    {:eng "Wednesday" :hir "すいようび"}
-    {:eng "Thursday" :hir "もくようび"}
-    {:eng "Friday" :hir "きんようび"}
-    {:eng "Saturday" :hir "どようび"}
 
     {:eng "January" :hir (num/jnumber "month" 1)}
     {:eng "February" :hir (num/jnumber "month" 2)}
@@ -320,8 +259,8 @@
    {:eng "gym" :kat "ジム"}
    {:eng "(swimming) pool" :kat "プール"}
    {:eng "wine store" :kat "ワインショップ"}
-   {:eng "information desk" :kat "インフォメーション"}
-   {:eng "first-floor basement" :hir "“ちか いっかい"}
+   {:eng "information (desk)" :kat "インフォメーション"}
+   {:eng "(first-floor) basement" :hir "ちか いっかい"}
    {:eng "basement" :hir "ちか"}
    {:eng ["bathroom" "restroom"] :hir "おてあらい"}
    {:eng "hotel" :kat "ホテル"}
@@ -335,7 +274,7 @@
    {:eng "car" :hir "くるま"}
    {:eng "taxi" :kat "タクシー"}
    {:eng ["motorbike" "motorcycle"] :kat "バイク"}
-   {:eng "bycicle" :hir "じてんしゃ"}
+   {:eng "bicycle" :hir "じてんしゃ"}
    {:eng ["on foot" "walking"] :hir "あるいて"}
 
    {:eng "(South) Korea" :hir "かんこく"}
@@ -398,9 +337,112 @@
            {:eng "black" :hir "くろい"}]})
 
 (defonce VERBS
-  [{:eng "go" :hir "いく"}
-   {:eng "come" :hir "くる" :n 5}
-   {:eng ["return" "come back"] :hir "かえります"}])
+  [
+   {:eng "meet" :hir "あう"}
+   {:eng "keep" :hir "あずかる"}
+   {:eng "wash" :hir "あらう"}
+   {:eng ["exist" "have" "take place"] :hir "ある"}
+   {:eng "walk" :hir "あるく"}
+   {:eng "say" :hir "いう"}
+   {:eng "go" :hir "いく"}
+   {:eng "sing" :hir "うたう"}
+   {:eng ["put" "place"] :hir "おく"}
+   {:eng "send" :hir "おくる"}
+   {:eng "swim" :hir "およぐ"}
+   {:eng "finish" :hir "おわる"}
+   {:eng "buy" :hir "かう"}
+   {:eng ["return" "come back"] :hir "かえる"}
+   {:eng "take [time]" :hir "かかる"}
+   {:eng ["write" "draw"] :hir "かく"}
+   {:eng ["lend" "loan"] :hir "かす"}
+   {:eng ["do one's best" "persevere"] :hir "がんばる"}
+   {:eng ["listen to" "ask"] :hir "きく"}
+   {:eng ["turn off" "shut off"] :hir "けす"}
+   {:eng "touch" :hir "さわる"}
+   {:eng "know" :hir "しる"}
+   {:eng "smoke" :hir "タバコをすう"}
+   {:eng "live" :hir "すむ"}
+   {:eng "sit down" :hir "すわる"}
+   {:eng "stand up" :hir "たつ"}
+   {:eng "use" :hir "つかう"}
+   {:eng "arrive" :hir "つく"}
+   {:eng "make" :hir "つくる"}
+   {:eng "take a photo" :hir "しゃしんをとる"}
+   {:eng ["learn" "take lessons in"] :hir "ならう"}
+   {:eng ["suit" "look good on"] :hir "にあう"}
+   {:eng "climb" :hir "のぼる"}
+   {:eng "drink" :hir "のむ"}
+   {:eng ["get on" "take"] :hir "のる"}
+   {:eng "enter" :hir "はいる"}
+   {:eng "run" :hir "はしる"}
+   {:eng ["talk" "speak"] :hir "はなす"}
+   {:eng "turn" :hir "まがる"}
+   {:eng "wait" :hir "まつ"}
+   {:eng "receive" :hir "もらう"}
+   {:eng ["rest" "take day off"] :hir "やすむ"}
+   {:eng "read" :hir "よむ"}
+   {:eng "understand" :hir "わかる"}
+
+   {:eng "open" :hir "あける"}
+   {:eng "give" :hir "あげる"}
+   {:eng "take a shower" :hir "シャワーをあびる"}
+   {:eng ["be" "exist" "stay"] :hir "いる"}
+   {:eng ["put in" "add"] :hir "いれる"}
+   {:eng ["teach" "tell"] :hir "おしえる"}
+   {:eng "get off" :hir "のりる"}
+   {:eng "borrow" :hir "かりる"}
+   {:eng "close" :hir "しめる"}
+   {:eng "eat" :hir "たべる"}
+   {:eng "get tired" :hir "つかれる"}
+   {:eng "turn on" :hir "つける"}
+   {:eng "be careful" :hir "きをつける"}
+   {:eng "relay a message" :hir "つたえる"}
+   {:eng ["work for" "be employed"] :hir "つめとる"}
+   {:eng "be done" :hir "できる"}
+   {:eng "leave" :hir "でる"}
+   {:eng "deliver" :hir "とどける"}
+   {:eng ["stop" "park"] :hir "とめる"}
+   {:eng ["sleep" "go to bed"] :hir "ねる"}
+   {:eng ["start" "begin"] :hir "はじめる"}
+   {:eng "show" :hir "みせる"}
+   {:eng ["see" "watch"] :hir "みる"}
+
+   {:eng "come" :hir "くる"}
+   {:eng "bring" :hir "もってくる"}
+   {:eng "do" :hir "する"}
+   {:eng "worry about" :hir "きにする"}
+   {:eng "recharge" :hir "じゅうでんする"}
+   {:eng "download" :hir "ダウンロードする"}
+   {:eng "check" :hir "チェックする"}
+   {:eng "oversleep" :hir "ねぼうする"}
+   {:eng "report" :hir "ほうこくする"}
+   {:eng "make a reservation" :hir "よやくする"} 
+   {:eng "have a preparatory meeting" :hir "うちあわせをする"}
+   {:eng "exercise" :hir "うんどうをする"}
+   {:eng "view cherry blossums" :hir "おはなみをする"}
+   {:eng "have a meeting" :hir "かいぎをする"}
+   {:eng "shop" :hir "かいものをする"}
+   {:eng "make a copy" :hir "コピーをする"}
+   {:eng "play golf" :hir "ゴルフをする"}
+   {:eng "take a walk" :hir "さんぽをする"}
+   {:eng "work" :hir "しごとをする"}
+   {:eng "prepare" :hir "じゅんびをする"}
+   {:eng "jog" :hir "ジョギングをする"}
+   {:eng "have a meal" :hir "しょくじをする"}
+   {:eng "ski" :hir "スキーをする"}
+   {:eng "stretch" :hir "ストレッチをする"}
+   {:eng "snowboard" :hir "スノーボードをする"}
+   {:eng "explain" :hir "せつめいをする"}
+   {:eng "clean" :hir "そうじおする"}
+   {:eng "scuba dive" :hir "ダイビングをする"}
+   {:eng "play tennis" :hir "テニスをする"}
+   {:eng ["phone" "call"] :hir "でんわをする"}
+   {:eng "go for a drive" :hir "ドライブをする"}
+   {:eng "have a party" :hir "パーティーをする"}
+   {:eng "give a presentation" :hir "プレゼンをする"}
+   {:eng "study" :hir "べんきょうをする"}
+   {:eng "cook" :hir "りょうりをする"}
+   ])
 
 (defonce quiz-expressions
   (quiz-terms
@@ -440,24 +482,13 @@
      ; The following question words can be used with 「も」 to include and/or exclude everything.
      ;誰も 【だれ・も】 – everybody or nobody when used with negative, (N5)
      ;何も 【なに・も】 – nothing/not anything/not any kind of when used with negative (N5)
-     ;どこも – everywhere or nowhere when used with negative (N5)
-     ;どうしても – no matter what
-     ;どちらも – both ways
-     ;いつも – always
      ; Things aren’t as consistent as one would hope however. For example, 「何も」 is usually not used to mean “everything”. And 「いつも」 always means “always” for both positive and negative forms. Other words can be used instead to express similar concepts.
-     ;皆 【みんな】 – everybody
-     ;皆さん 【みな・さん】 – everybody (polite)
-     ;全部 【ぜん・ぶ】 – everything
      ;全然　【ぜん・ぜん】 – not at all (when used with negative)
      ;絶対 【ぜっ・たい】 – absolutely, unconditionally or never when used with negative
 
      ; The combination of two particles 「でも」 can be used with question words to indicate “any”.
      {:eng "anybody" :hir "だれ・でも" :kan "誰でも"}
-     {:eng "anything" :hir "なん・でも" :kan "何でも"}
-     {:eng "anywhere" :hir "どこでも"}
      {:eng "any amount" :hir "いくらでも"}
-     {:eng "anyhow" :hir "どうでも"}
-     {:eng "any way" :hir "どちらでも"}
      {:eng "any time" :hir "いつでも"}
      {:eng "any number of things" :hir "いくつでも"}
 
@@ -467,10 +498,7 @@
      ;どうしてか – for some reason
      ;なんでか – for some reason (casual)
      ;なぜか – for some reason (formal)
-     {:eng "somewhere" :hir "どこか" :n 5}
      {:eng "some amount" :hir "いくらか"}
-     {:eng "somehow" :hir "どうか"}
-     {:eng "one way (of the two)" :hir "どちらか"}
      {:eng "sometime" :hir "いつか"}
      {:eng "some number of things" :hir "いくつか"}
 
@@ -481,23 +509,6 @@
      {:eng ["(not) at all"] :hir "ぜんぜん" :n 4}
      {:eng ["hardly possible" "cannot be" "highly unlikely" "improbable"] :hir "はずがない" :n 4}
      {:eng ["might" "maybe" "probably"] :hir "かもしれない" :n 4}
-
-     ; qualifiers
-     {:eng ["almost all" "most" "hardly any" "few"] :pos :adverbial-noun :hir "ほとんど" :n 4}
-     {:eng ["many" "a lot of" "plenty" "enough"] :hir "たくさん" :n 5}
-     {:eng ["only" "just"] :hir "だけ" :n 5}
-     {:eng ["still" "not yet"] :hir "まだ" :n 5}
-     {:eng ["already" "anymore"] :hir "もう" :n 5} 
-     {:eng ["gradually" "little by little" "step by step"] :hir "だんだん" :n 4}
-     {:eng ["progressively" "rapidly increasing" "more and more"] :hir "どんどん" :n 4} 
-     {:eng ["just by" "just with"] :hir "だけで" :n 4}
-     {:eng ["around" "about"] :hir "ごろ" :n 4}
-     {:eng ["most" "mostly" "adequately" "generally" "for the most part" "roughly" "approximately" "in the first place"] :hir "だいたい" :n 4}
-     {:eng ["less than (or equal to)" "under" "blow" "any less" "fewer" "not exceeding"] :hir "いか" :n 4}
-     {:eng ["except" "besides" "other than" "with the exception of"] :hir "いがい" :n 4}
-     {:eng ["each" "every" "respective" "various"] :hir "各" :n 4}
-     {:eng ["each" "every" "at intervals of"] :hir "ごとに" :n 4}
-     {:eng ["more than" "over"] :hir "より" :n 4}
 
      ; event sequence
      {:eng ["after" "later"] :hir "あとで" :n 4}
@@ -531,7 +542,6 @@
      {:eng ["also" "too" "as well" "even" "either" "neither"] :hir "も" :n 5}
      {:eng "or" :hir "か" :n 5}
      {:eng ["things like" "and the like"] :hir "や" :n 5}
-     {:eng "with" :hir "と" :n 5}
      {:eng ["also" "as well" "moreover" "again" "additionally"] :hir "また" :n 4}
      {:eng ["among other things" "for example" "such as"] :hir "とか" :n 4}
 
@@ -541,31 +551,6 @@
      {:eng ["to start with" "firstly"] :hir "まず" :n 4}
      {:eng ["for example"] :hir "たとえば" :n 4}
      {:eng ["finally" "after all"] :hir "とうとう" :n 4}
-
-     ; qualifiers (adverbs etc)
-     {:eng ["is alright" "is fine" "is okay even if" "can" "may" "is also okay"] :hir "てもいい" :n 5}
-     {:eng ["must do" "have to do"] :hir "なくてはいけない" :n 5}
-     {:eng ["must do" "have to do"] :hir "なくてはならない" :n 5}
-     {:eng ["must not" "may not"] :hir "てはいけない" :n 5}
-     {:eng ["should do" "it'd be better to"] :hir "たほうがいい" :n 5}
-     {:eng ["shouldn't do" "it'd be better not to"] :hir "ないほうがいい" :n 5}
-     {:eng ["must do" "have to do"] :hir "なくちゃ・なきゃ" :n 5}
-     {:eng ["want to do"] :hir "たい" :n 5}
-     {:eng ["like doing" "love doing"] :hir "のがすき" :n 5}
-     {:eng ["like" "fond of"] :kat "好き" :n 5}
-     {:eng ["dislike" "not fond of"] :hir "きらい" :n 5}
-     {:eng "have done before" :hir "たことがある" :n 5}
-     {:eng ["won't you" "would you not" "why don't we"] :hir "ませんか" :n 5}
-     {:eng ["don't have to"] :hir "なくてもいい" :n 4}
-     {:eng ["I think"] :hir "とおもう" :n 4}
-     {:eng ["you could say" "you might say"] :hir "といってもいい" :n 4}
-     {:eng ["I'm sorry for"] :hir "てすみません" :n 4}
-     {:eng ["I hope" "I wish" "you should" "it would be good"] :hir "といい" :n 4}
-     {:eng ["on the verge of" "about to"] :hir "るところだ" :n 4}
-     {:eng ["easy to" "likely to"] :hir "やすい" :n 4}
-     {:eng ["difficult to" "hard to"] :hir "にくい" :n 4}
-     {:eng ["need" "necessary"] :hir "がひつよう" :n 4}
-     {:eng ["why don't you" "what if you did"] :hir "たらどう" :n 4}
      
      ; requests
      {:eng ["please do"] :hir "てください" :f :polite :n 5}
@@ -598,6 +583,14 @@
             quiz (quiz-terms (vec terms))]
       (quiz))))
 
+(defn quiz-verbs []
+  (let [verb (rand-nth VERBS)
+        form (rand-nth (keys conjugate/FORMS))
+        fn (get conjugate/FORMS form)
+        group (conjugate/verb-group (:hir verb))
+        conjugated (fn (:hir verb) group)]
+    (quiz-loop (k/romanize conjugated) (str (:eng verb) " " form))))
+
 ; TODO: kanji readings
 ; TODO: verb conjugations
 (defonce quizzes {"time" quiz-time
@@ -606,7 +599,7 @@
                   "vocab" (quiz-terms (concat OBJECTS PEOPLE LOCATIONS EVENTS SUFFIXES))
                   "expressions" quiz-expressions
                   "counters" (quiz-terms (num/num-terms))
-                  "JLPT N5 vocab" (quiz-jisho-tag "jlpt-n5")})
+                  "verbs" quiz-verbs})
 
 ; TODO: fix stats calculation
 ; TODO: fix errors when exiting during quiz selection
