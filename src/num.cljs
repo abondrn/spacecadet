@@ -2,7 +2,7 @@
   (:require
    [clojure.math :as math]
    [clojure.string :as str]
-   
+
    [src.kana :as k]))
 
 (defn randrange
@@ -17,33 +17,6 @@
   (let [p (randrange min-places (inc max-places))
         n (math/pow 10 p)]
     (randrange n (dec (* 10 n)))))
-
-(defonce HOURS
-  ["いち"
-   "に"
-   "さん"
-   "よ"
-   "ご"
-   "ろく"
-   "しち"
-   "はち"
-   "く"
-   "じゅう"
-   "じゅう いち"
-   "じゅう に"])
-
-(defonce MINUTES {0 ""
-                  5 "ご ふん"
-                  10 "じゅっぷん"
-                  15 "じゅうご ふん"
-                  20 "にじゅっぷん"
-                  25 "にじゅうご ふん"
-                  30 "さんじゅっぷん"
-                  35 "さんじゅうご ふん"
-                  40 "よんじゅっぷん"
-                  45 "よんじゅうご ふん"
-                  50 "ごじゅっぷん"
-                  55 "ごじゅうご ふん"})
 
 (defonce DIGITS ["ゼロ" "いち" "に" "さん" "よん" "ご" "ろく" "なな" "はち" "きゅう"])
 
@@ -66,23 +39,29 @@
 (defmethod jnumber "10k" [u n]
   (get ["いちまん" "にまん" "さんまん" "よんまん" "ごまん" "ろくまん" "ななまん" "はちまん" "きゅうまん"] (dec n)))
 
-; counter for long, cylindrical things; counter for films, TV shows, etc.; counter for goals, home runs, etc.; counter for telephone calls
-; TODO: handle numbers larger than 10
+(defn ridx [coll i j]
+  (let [i' (if (>= i 0) i (+ i (count coll)))
+        j' (if (>= j 0) j (+ j (count coll)))]
+    (subs coll i' j')))
+
+(defn jnumber-with-sandhi [n suffix cases]
+  (cond (contains? cases n) (get cases n)
+        :else (let [modulo (mod n 10)]
+                (cond (and (not (zero? modulo)) (contains? cases modulo)) (str (jnumber :default (- n modulo)) (get cases modulo))
+                      (and (zero? modulo) (not (zero? n)) (contains? cases 10)) (str (ridx (jnumber :default n) 0 -3) (get cases 10))
+                      :else (str (jnumber :default n) suffix)))))
+
+; counter for long, cylindrical things
+; counter for films, TV shows, etc.
+; counter for goals, home runs, etc.
+; counter for telephone calls
 (defmethod jnumber "本" [u n]
-  (case n
-    "?" "なんぼん"
-    "*" "まいほん"
-    "各" "かくほん"
-    1 "いっぽん"
-    2 "にほん"
-    3 "さんぼん"
-    4 "よんほん"
-    5 "ごほん"
-    6 "ろっぽん"
-    7 "ななほん"
-    8 "はっぽん"
-    9 "きゅうほん"
-    10 "じゅっぽん"))
+  (jnumber-with-sandhi n "ほん" {"?" "なんぼん"
+                               1 "いっぽん"
+                               3 "さんぼん"
+                               6 "ろっぽん"
+                               8 "はっぽん"
+                               10 "じゅっぽん"}))
 
 ; general-purpose counter​; Usually written using kana alone, suffixed to Japanese numerals 1-9 (ひと, ふた, etc.)
 ; 箇; 箇: Rarely-used kanji form. 個: Rarely-used kanji form.
@@ -114,14 +93,11 @@
 
 ; counter for storeys and floors of a building
 (defmethod jnumber "階" [u n]
-  (case n
-    "?" "なんかい"
-    1 "いっかい"
-    2 "にかい"
-    3 "さんがい"
-    4 "よんかい"
-    5 "ごかい"
-    6 "ろっかい"))
+  (jnumber-with-sandhi n "かい" {"?" "なんかい" ; なんがい　also works
+                               1 "いっかい"
+                               3 "さんがい"
+                               6 "ろっかい"
+                               10 "じゅっかい"}))
 
 ; 1. counter for thin, flat objects (e.g. sheets of paper, plates, coins)​
 ; 2. counter for portions of gyōza or soba​
@@ -133,56 +109,47 @@
   (str (jnumber :default n) "まい"))
 
 (defmethod jnumber "hour" [u n]
-  (if (= "?" n)
-    "なんじ"
-    (str
-     (get HOURS (dec n))
-     "じ")))
+  (jnumber-with-sandhi n "じ" {4 "よ"
+                              9 "く"}))
 
 (defmethod jnumber "hours" [u n]
   (str (jnumber "hour" n) "かん"))
 
 (defmethod jnumber "minute" [u n]
-  (if (= "?" n)
-    "なんぷん"
-    (get MINUTES n)))
+  (jnumber-with-sandhi n "ふん" {"?"  "なんぷん"
+                               0 ""
+                               1 "いっぷん"
+                               3 "さんぷん"
+                               4 "よんぷん"
+                               6 "ろっぷん"
+                               8 "はっぷん"
+                               10 "じゅっぷん"}))
 
 (defmethod jnumber "minutes" [u n]
   (str (jnumber "minute" n) "かん"))
 
-(defmethod jnumber "years" [u n] 
-  (case n
-    "*" "まいとし"
-    4 "よねんかん"
-    (str (jnumber :default n) "ねんかん")))
+(defmethod jnumber "years" [u n]
+  (jnumber-with-sandhi n "ねんかん" {"*"  "まいとし"
+                                 4 "よねんかん"}))
 
 (defmethod jnumber "month" [u n]
-  (str (if (= n 4) "し" (jnumber :default n)) "がつ"))
+  (jnumber-with-sandhi n "がつ" {"*" "まいつき"
+                               4 "しがつ"}))
 
 ;　ヶ月
 (defmethod jnumber "months" [u n]
-  (case n
-    "?" "なんかげつ"
-    "*" "まいつき"
-    "各" "かくかげつ" ; TODO: verify
-    1 "いっかげつ"
-    2 "にかげつ"
-    3 "さんかげつ"
-    4 "よんかげつ"
-    5 "ごかげつ"
-    6 "ろっかけつ"
-    7 "ななかげつ"
-    8 "はちかげつ"
-    9 "きゅうかげつ"
-    10 "じゅっかげつ")) 
+  (jnumber-with-sandhi n "かげつ" {"*" "まいつき"
+                                "各" "かくがつ"
+                                1 "いっかげつ"
+                                6 "ろっかけつ"
+                                10 "じゅっかげつ"}))
 
 (defmethod jnumber "weeks" [u n]
-  (case n
-    "*" "まいしゅう"
-    1 "いっしゅうかん"
-    8 "はっしゅうかん"
-    10 "じゅっしゅうかん"
-    (str (jnumber :default n) "しゅうかん")))
+  (jnumber-with-sandhi n "しゅうかん"
+                       {"*" "まいしゅう"
+                        1 "いっしゅうかん"
+                        8 "はっしゅうかん"
+                        10 "じゅっしゅうかん"}))
 
 (defmethod jnumber "day" [u n]
   (case n
