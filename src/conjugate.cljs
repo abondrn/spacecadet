@@ -20,41 +20,48 @@
 (defonce phoneme->hira
   (into {} (for [[hira letters] hira-table] [letters hira])))
 
-(defn idx [coll i]
+(defn idx "`get` but with support for negative indexing"
+  [coll i]
   (if (< i 0)
     (get coll (+ i (count coll)))
     (get coll i)))
 
-(defn ridx [coll i j]
+(defn ridx "`subs` but with support for negative indexing"
+  [coll i j]
   (let [i' (if (>= i 0) i (+ i (count coll)))
         j' (if (>= j 0) j (+ j (count coll)))]
     (subs coll i' j')))
 
-(defn butlasts
+(defn butlasts "Returns the string without the last n characters (n defaults to 1)"
   ([s]
    (ridx s 0 -1))
   ([s n]
    (ridx s 0 (- n))))
 
-(defn shift [hira vowel]
+(defn shift "Performs a vowel shift on a hiragana character"
+  [hira vowel]
   (let [[c v] (hira->phoneme hira)]
     (phoneme->hira (str c vowel))))
 
-(defn shift-last [word vowel]
+(defn shift-last "Performs a vowel shift on the last hiragana character of a string"
+  [word vowel]
   (str (butlasts word) (shift (last word) vowel)))
 
-(defn verb-group [verb]
+(defn verb-group "Predicts the class of a hiragana-only word"
+  [verb]
   (cond
     ; copula (technically not a verb, but can be conjugated) 
     (= "だ" verb) "だ"
-    (and (= "い" (last verb)) (not (contains? #{"きれい" "嫌い" "きらい" "幸い" "さいわい"} verb))) :i-adj
     ; irregular / V3
     (str/ends-with? verb "する") "する"
     ; reading of 来る
-    (str/ends-with? verb "くる") "くる"
+    (and (str/ends-with? verb "くる") (not= verb "おくる")) "くる"
+    ; NOTE: there are exceptions to this rule v
     (and (str/ends-with? verb "る") (#{"i" "e"} (last (hira->phoneme (idx verb -2))))) :ichidan ; The Ru-verbs, also known as the V2 verbs 
     (= "u" (last (hira->phoneme (last verb)))) :godan ; The U-verbs, also known as V1 verbs
-    :else :noun-or-na-adj))
+    (not (= "い" (last verb))) :noun-or-na-adj
+    ; else, either :i-adj or :noun-or-na-adj but impossible to know for sure
+    ))
 
 (defn v-stem
   "conjunctive / stem / masu / i / continuative form"
@@ -112,32 +119,33 @@
     :i-adj (str (butlasts verb) "かった")
     :noun-or-na-adj (str (butlasts verb) "った")))
 
-; Pillar of Japanese grammar, the te-form is the cement that helps connect clauses together to build more complex sentences. For example, you use the te-form to list success actions or to show causality between several events
-; In principle, a sentence with a te-form inflected verb is a subordinate clause that requires the main clause to be grammatically complete. However, when casually speaking, native speakers sometimes stop at a te-form verb clause, leaving the rest of the sentence implied. 
-(defn affirmative-te [verb group]
+(defn affirmative-te "connective form"
+  [verb group]
   (case group
     "だ" "な"
     :godan (str (butlasts verb) (case (last verb)
-                                 "う" (case verb
-                                       "問う" "うて"
-                                       "請う" "うて"
-                                       "って")
-                                 "つ" "って"
-                                 "る" "って"
-                                 
-                                 "む" "んで"
-                                 "ぶ" "んで"
-                                 "ぬ" "んで"
+                                  "う" (case verb
+                                        "問う" "うて"
+                                        "請う" "うて"
+                                        "って")
+                                  "つ" "って"
+                                  "る" "って"
 
-                                 "く" (if (= verb "行く")
-                                       "って"
-                                       "いて")
+                                  ; nasally sounds
+                                  "む" "んで"
+                                  "ぶ" "んで"
+                                  "ぬ" "んで"
 
-                                 "ぐ" "いで"
-                                 "す" "して"))
+                                  ; back of throat
+                                  "く" (if (= verb "行く")
+                                        "って"
+                                        "いて")
+                                  "ぐ" "いで"
+
+                                  "す" "して"))
     :ichidan (str (butlasts verb) "て")
     "する" (str (butlasts verb 2) "して")
-    "くる" (str (butlasts verb 2) "きた")
+    "くる" (str (butlasts verb 2) "きて")
     :i-adj (str (butlasts verb) "くて")
     :noun-or-na-adj (str verb "で")))
 
@@ -292,9 +300,11 @@
         [:presumptive true false] (str (ta verb group) "でしょう")
         [:presumptive true true] (str (nakatta verb group) "でしょう")))))
 
-(defn conjugate-with-negation [form negative?]
+(defn conjugate-with-negation "returns a function which conjugates a word into a form which does not support politeness"
+  [form negative?]
   (case form
     :ba (if negative? negative-ba affirmative-ba)
+    ; In principle, a sentence with a te-form inflected verb is a subordinate clause that requires the main clause to be grammatically complete. However, when casually speaking, native speakers sometimes stop at a te-form verb clause, leaving the rest of the sentence implied. 
     :te (if negative? negative-te affirmative-te)
     :imperative (if negative? negative-imperative imperative)))
 

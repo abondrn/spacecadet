@@ -5,7 +5,7 @@
 
    [src.kana :as k]))
 
-(defn randrange
+(defn randrange "Generates a random integer in a given range"
   ([end]
    (randrange 0 end 1))
   ([start end]
@@ -13,14 +13,15 @@
   ([start end step]
    (+ start (* step (rand-int (math/floor-div (- end start) step))))))
 
-(defn randnum [min-places max-places]
+(defn randnum "Generates a random integer which has between min-places and max-places decimal digits"
+  [min-places max-places]
   (let [p (randrange min-places (inc max-places))
         n (math/pow 10 p)]
     (randrange n (dec (* 10 n)))))
 
 (defonce DIGITS ["ゼロ" "いち" "に" "さん" "よん" "ご" "ろく" "なな" "はち" "きゅう"])
 
-(defmulti jnumber identity)
+(defmulti jnumber "Returns of the reading of a counter, given the unit and quantity" identity)
 
 (defmethod jnumber "number" [u n]
   (str (jnumber :default n) "ばん"))
@@ -39,17 +40,20 @@
 (defmethod jnumber "10k" [u n]
   (get ["いちまん" "にまん" "さんまん" "よんまん" "ごまん" "ろくまん" "ななまん" "はちまん" "きゅうまん"] (dec n)))
 
-(defn ridx [coll i j]
+(defn ridx "subs but with negative indexing support"
+  [coll i j]
   (let [i' (if (>= i 0) i (+ i (count coll)))
         j' (if (>= j 0) j (+ j (count coll)))]
     (subs coll i' j')))
 
-(defn jnumber-with-sandhi [n suffix cases]
-  (cond (contains? cases n) (get cases n)
-        :else (let [modulo (mod n 10)]
-                (cond (and (not (zero? modulo)) (contains? cases modulo)) (str (jnumber :default (- n modulo)) (get cases modulo))
-                      (and (zero? modulo) (not (zero? n)) (contains? cases 10)) (str (ridx (jnumber :default n) 0 -3) (get cases 10))
-                      :else (str (jnumber :default n) suffix)))))
+(defn jnumber-with-sandhi "Helper method that simplies lookup of sandhi rules"
+  [n suffix cases]
+  (if (contains? cases n)
+    (get cases n)
+    (let [modulo (mod n 10)]
+      (cond (and (not (zero? modulo)) (contains? cases modulo)) (str (jnumber :default (- n modulo)) (get cases modulo))
+            (and (zero? modulo) (not (zero? n)) (contains? cases 10)) (str (ridx (jnumber :default n) 0 -3) (get cases 10))
+            :else (str (jnumber :default n) suffix)))))
 
 ; counter for long, cylindrical things
 ; counter for films, TV shows, etc.
@@ -193,10 +197,11 @@
                       1 (jnumber "d" place)
                       0 (get DIGITS place))))))
 
-(defn ord [n]
+(defn ord "Returns the English ordinal (`nth`) for an integer"
+  [n]
   (case n 0 "zeroth" 1 "first" 2 "second" 3 "third" 4 "fourth" 5 "fifth" 6 "sixth" 7 "seventh" 8 "eighth" 9 "ninth"))
 
-(defn num-terms []
+(defn num-terms "Generates a series of counter terms that the user can be quizzed on"
   (concat
    (for [u ["d" "c" "k" "10k"]
          n (range 1 10)

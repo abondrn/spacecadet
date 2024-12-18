@@ -18,6 +18,11 @@ const RE_KANJI = /\p{Unified_Ideograph}/ug;
 const RE_KATA = /\p{sc=Katakana}/u;
 
 
+/**
+ * Fetches a list of subjects from WaniKani. See here: https://docs.api.wanikani.com/20170710/#get-all-subjects
+ * @param {string} types 
+ * @returns An array of Subject objects
+ */
 async function getSubjects(types) {
   var response = await axios.get('https://api.wanikani.com/v2/subjects', {
     headers: HEADERS,
@@ -37,6 +42,11 @@ async function getSubjects(types) {
 }
 
 
+/**
+ * Fetches a list of assignments from WaniKani. See here: https://docs.api.wanikani.com/20170710/#get-all-assignments
+ * @param {object} params The parameters to be passed to the endpoint.
+ * @returns 
+ */
 async function getAssignments(params) {
   var response = await axios.get('https://api.wanikani.com/v2/assignments', {
     headers: HEADERS,
@@ -78,6 +88,10 @@ async function getJLPTVocab() {
 }
 
 
+/**
+ * Counts the number of assignments at each review level. For example, 1-4 ~ Apprentice I-IV.
+ * @returns An object that maps srs_stage -> counts.
+ */
 async function getAssignmentsByLevel() {
   const assignments = await getAssignments({
     started: true
@@ -95,12 +109,15 @@ async function getAssignmentsByLevel() {
 }
 
 
-async function moveN3N5VocabToReview() {
+/**
+ * Moves vocabulary from JLPT which is available for lessons into review.
+ */
+async function moveJLPTVocabToReview() {
     try {
       // Fetch all subjects
       const assignments = await getAssignments({
-            unlocked: true,
-            immediately_available_for_lessons: true,
+        unlocked: true,
+        immediately_available_for_lessons: true,
       });
   
       const lessonSubjectIds = {};
@@ -269,9 +286,45 @@ async function customVocabList() {
   });
 }
 
+/**
+ * Obtains vocabulary which can be conjugated.
+ * @param {Number} minLevel the minimum SRS stage the vocabulary item should be at to be included.
+ */
+async function conjugationPractice(minLevel) {
+  const assignments = await getAssignments({
+    started: true,
+    subject_types: 'vocabulary',
+  });
+
+  const lessonSubjectIds = {};
+  assignments.forEach(a => {
+    lessonSubjectIds[a.data.subject_id] = a;
+  });
+
+  const subjects = await getSubjects('vocabulary');
+
+  const vocabToReview = subjects.filter(subject => {
+    const assignment = lessonSubjectIds[subject.id];
+    
+    if (assignment === undefined || assignment.data.srs_stage < minLevel) {
+      return false;
+    }
+
+    for (const pos of subject.data.parts_of_speech) {
+      if (['な adjective', 'い adjective', 'intransitive verb', 'ichidan verb', 'transitive verb', 'godan verb', 'verbal noun'].indexOf(pos) !== -1) {
+        return true;
+      }
+    }
+
+    return false;
+  }).map(subject => subject.data);
+  return vocabToReview;
+}
+
 
 // Run the script
 // TODO: create subcommands
-moveN3N5VocabToReview();
+moveJLPTVocabToReview();
 //showComprehensibleVocab();
 //customVocabList();
+//conjugationPractice(5);
