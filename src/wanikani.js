@@ -1,6 +1,9 @@
+#!/usr/bin/env node
 const fs = require('fs').promises;
 
 const axios = require('axios');
+const yargs = require('yargs');
+const { hideBin } = require('yargs/helpers');
 
 
 const WANIKANI_API_KEY = process.env.WANIKANI_API_KEY;
@@ -12,7 +15,6 @@ const HEADERS = {
   'Authorization': `Bearer ${WANIKANI_API_KEY}`,
   'Wanikani-Revision': '20170710'
 };
-const MAX_APPRENTICE_ITEMS = 100;
 
 const RE_KANJI = /\p{Unified_Ideograph}/ug;
 const RE_KATA = /\p{sc=Katakana}/u;
@@ -32,7 +34,7 @@ async function getSubjects(types) {
   });
   const subjects = response.data.data;
   while (response.data.pages.next_url != null) {
-    console.log(response.data.pages.next_url);
+    //console.log(response.data.pages.next_url);
     response = await axios.get(response.data.pages.next_url, {
       headers: HEADERS,
     });
@@ -112,7 +114,7 @@ async function getAssignmentsByLevel() {
 /**
  * Moves vocabulary from JLPT which is available for lessons into review.
  */
-async function moveJLPTVocabToReview() {
+async function moveJLPTVocabToReview(numItems) {
     try {
       // Fetch all subjects
       const assignments = await getAssignments({
@@ -124,10 +126,6 @@ async function moveJLPTVocabToReview() {
       assignments.forEach(a => {
         lessonSubjectIds[a.data.subject_id] = a;
       });
-
-      const assignmentsByLevel = await getAssignmentsByLevel();
-      const apprenticeAssignments = assignmentsByLevel['1'] + assignmentsByLevel['2'] + assignmentsByLevel['3'] + assignmentsByLevel['4'];
-      if (apprenticeAssignments >= MAX_APPRENTICE_ITEMS) return;
 
       const subjects = await getSubjects('vocabulary,kana_vocabulary');
       
@@ -152,7 +150,7 @@ async function moveJLPTVocabToReview() {
       }));
 
       // Move each vocab to review
-      const numToMove = Math.min(vocabToReview.length, MAX_APPRENTICE_ITEMS - apprenticeAssignments);
+      const numToMove = Math.min(vocabToReview.length, numItems);
       for (let i=0; i < numToMove; i++) {
         const vocab = vocabToReview[i];
         const assignment = await axios.put(`https://api.wanikani.com/v2/assignments/${vocab.assignment.id}/start`,
@@ -322,9 +320,71 @@ async function conjugationPractice(minLevel) {
 }
 
 
-// Run the script
-// TODO: create subcommands
-moveJLPTVocabToReview();
-//showComprehensibleVocab();
-//customVocabList();
-//conjugationPractice(5);
+const commands = [
+  {
+    command: 'move',
+    description: 'Move JLPT vocabulary to review',
+    builder: {
+      number: {
+        alias: 'n',
+        describe: 'Number of items to move to review',
+        type: 'number',
+        default: 100,
+        demandOption: true
+      }
+    },
+    handler: async (argv) => {
+      const numItems = argv.number;
+      if (numItems !== null && numItems <= 0) {
+        console.error('Number of items must be positive');
+        process.exit(1);
+      }
+      await moveJLPTVocabToReview(numItems);
+    }
+  },
+  {
+    command: 'show',
+    description: 'Show comprehensible vocabulary',
+    handler: showComprehensibleVocab
+  },
+  {
+    command: 'vocab-list',
+    description: 'Show custom vocabulary list',
+    handler: customVocabList
+  },
+  {
+    command: 'conjugate',
+    description: 'Start conjugation practice',
+    builder: {
+      stage: {
+        alias: 's',
+        describe: 'Minimum SRS stage',
+        type: 'number',
+        default: null,
+        demandOption: true
+      }
+    },
+    handler: async (argv) => {
+      const stage = argv.stage;
+      if (stage !== null && stage <= 0) {
+        console.error('Stage must be positive');
+        process.exit(1);
+      }
+      await conjugationPractice(stage);
+    }
+  }
+];
+
+
+if (require.main === module) {
+  (yargs(hideBin(process.argv))
+    .scriptName('wanikani')
+    .usage('$0 <cmd> [args]')
+    .command(commands)
+    .demandCommand(1, 'You need to specify a command')
+    .strict()
+    .help()
+    .alias('help', 'h')
+    .version('1.0.0')
+    .parse());
+}

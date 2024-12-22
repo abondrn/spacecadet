@@ -14,3 +14,8 @@ Then, launch interactive prompt with
 ```
 npm run quiz
 ```
+
+Or, run one of the available WaniKani-related commands with (must run `npm link` first)
+```
+wanikani -h
+```

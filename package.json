@@ -5,8 +5,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "quiz": "npx nbb -m src.quiz",
+    "wanikani": "node ",
     "download-kanji": "curl -o kanji.json https://raw.githubusercontent.com/davidluzgouveia/kanji-data/master/kanji-wanikani.json"
+  },
+  "bin": {
+    "wanikani": "src/wanikani.js"
   },
   "author": "",
   "license": "ISC",
@@ -16,6 +19,7 @@
     "inquirer": "^10.1.0",
     "mecab-async": "^0.1.2",
     "nbb": "^1.2.190",
-    "unofficial-jisho-api": "^2.3.4"
+    "unofficial-jisho-api": "^2.3.4",
+    "yargs": "^17.7.2"
   }
 }
