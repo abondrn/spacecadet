@@ -65,12 +65,15 @@ async function getAssignments(params) {
 }
 
 
-async function getJLPTVocab() {
-  const N5vocab = JSON.parse(await fs.readFile('jlpt-n5.json', 'utf8'));
-  const N4vocab = JSON.parse(await fs.readFile('jlpt-n4.json', 'utf8'));
-
+async function getJLPTVocab(maxLevel) {
   const RE_DISAMBIG = /-\d$/;
-  const vocab = N5vocab.concat(N4vocab);
+  const vocab = JSON.parse(await fs.readFile('jlpt-n5.json', 'utf8'));
+  if (maxLevel <= 4) {
+    vocab.push(...JSON.parse(await fs.readFile('jlpt-n4.json', 'utf8')));
+  }
+  if (maxLevel <= 3) {
+    vocab.push(...JSON.parse(await fs.readFile('jlpt-n3.json', 'utf8')));
+  }
   for (const v of vocab) {
     const sense1 = v.senses[0];
     v.reading = v.japanese[0].reading;
@@ -114,7 +117,7 @@ async function getAssignmentsByLevel() {
 /**
  * Moves vocabulary from JLPT which is available for lessons into review.
  */
-async function moveJLPTVocabToReview(numItems) {
+async function moveJLPTVocabToReview(numItems, maxJLPTLevel) {
     try {
       // Fetch all subjects
       const assignments = await getAssignments({
@@ -129,7 +132,7 @@ async function moveJLPTVocabToReview(numItems) {
 
       const subjects = await getSubjects('vocabulary,kana_vocabulary');
       
-      const N5toN4Words = new Set((await getJLPTVocab()).map(v => v.slug));
+      const N5toN4Words = new Set((await getJLPTVocab(maxJLPTLevel)).map(v => v.slug));
 
       const vocabToReview = subjects.filter(subject => {
         // Skip if already reviewed
@@ -331,6 +334,12 @@ const commands = [
         type: 'number',
         default: 100,
         demandOption: true
+      },
+      jlpt: {
+        alias: 'j',
+        describe: 'Number of items to move to review',
+        type: 'number',
+        default: 3,
       }
     },
     handler: async (argv) => {
@@ -339,7 +348,7 @@ const commands = [
         console.error('Number of items must be positive');
         process.exit(1);
       }
-      await moveJLPTVocabToReview(numItems);
+      await moveJLPTVocabToReview(numItems, argv.jlpt);
     }
   },
   {
@@ -351,27 +360,6 @@ const commands = [
     command: 'vocab-list',
     description: 'Show custom vocabulary list',
     handler: customVocabList
-  },
-  {
-    command: 'conjugate',
-    description: 'Start conjugation practice',
-    builder: {
-      stage: {
-        alias: 's',
-        describe: 'Minimum SRS stage',
-        type: 'number',
-        default: null,
-        demandOption: true
-      }
-    },
-    handler: async (argv) => {
-      const stage = argv.stage;
-      if (stage !== null && stage <= 0) {
-        console.error('Stage must be positive');
-        process.exit(1);
-      }
-      await conjugationPractice(stage);
-    }
   }
 ];
 
