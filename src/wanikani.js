@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 const fs = require('fs').promises;
+const readline = require('readline');
 
 const axios = require('axios');
 const yargs = require('yargs');
+const YAML = require('yaml');
 const { hideBin } = require('yargs/helpers');
 
 
@@ -18,6 +20,21 @@ const HEADERS = {
 
 const RE_KANJI = /\p{Unified_Ideograph}/ug;
 const RE_KATA = /\p{sc=Katakana}/u;
+const RE_KANJI_NUM = /^第?[一二三四五六七八九十]+/u;
+
+// Create an interface for input and output
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+const prompt = (question) => {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      resolve(answer);
+    });
+  });
+};
 
 
 /**
@@ -25,12 +42,10 @@ const RE_KATA = /\p{sc=Katakana}/u;
  * @param {string} types 
  * @returns An array of Subject objects
  */
-async function getSubjects(types) {
-  var response = await axios.get('https://api.wanikani.com/v2/subjects', {
+async function getSubjects(params) {
+  let response = await axios.get('https://api.wanikani.com/v2/subjects', {
     headers: HEADERS,
-    params: {
-      types
-    }
+    params
   });
   const subjects = response.data.data;
   while (response.data.pages.next_url != null) {
@@ -47,10 +62,10 @@ async function getSubjects(types) {
 /**
  * Fetches a list of assignments from WaniKani. See here: https://docs.api.wanikani.com/20170710/#get-all-assignments
  * @param {object} params The parameters to be passed to the endpoint.
- * @returns 
+ * @returns list of assignments
  */
 async function getAssignments(params) {
-  var response = await axios.get('https://api.wanikani.com/v2/assignments', {
+  let response = await axios.get('https://api.wanikani.com/v2/assignments', {
     headers: HEADERS,
     params
   });
@@ -130,7 +145,7 @@ async function moveJLPTVocabToReview(numItems, maxJLPTLevel) {
         lessonSubjectIds[a.data.subject_id] = a;
       });
 
-      const subjects = await getSubjects('vocabulary,kana_vocabulary');
+      const subjects = await getSubjects({types: 'vocabulary,kana_vocabulary'});
       
       const N5toN4Words = new Set((await getJLPTVocab(maxJLPTLevel)).map(v => v.slug));
 
@@ -140,13 +155,28 @@ async function moveJLPTVocabToReview(numItems, maxJLPTLevel) {
 
         if (subject.data.type === 'kana_vocabulary') return true;
         
-        var chars = subject.data.characters;
+        let chars = subject.data.characters;
         if (chars.startsWith('〜')) {
           chars = chars.substring(1);
         }
-        if (!N5toN4Words.has(chars)) return false;
+        const m = chars.match(RE_KANJI_NUM);
+        if (m) {
+          chars = chars.substring(m[0].length);
+        }
+        if (chars.endsWith('する')) {
+          chars = chars.substring(0, chars.length - 2);
+        }
+        if (chars.endsWith('に')) {
+          chars = chars.substring(0, chars.length - 1);
+        }
+        if (N5toN4Words.has(chars)) return true;
+        if (chars.startsWith('お')) {
+          if (N5toN4Words.has(chars.substring(1))) return true;
+        } else {
+          if (N5toN4Words.has('お' + chars)) return true;
+        }
 
-        return true;
+        return false;
       }).map(subject => ({
         assignment: lessonSubjectIds[subject.id],
         subject: subject,
@@ -185,20 +215,22 @@ async function moveJLPTVocabToReview(numItems, maxJLPTLevel) {
 
 
 async function showComprehensibleVocab() {
-  const assignments = await getAssignments({});
+  const assignments = await getAssignments({
+    started: true,
+  });
   
   const lessonSubjectIds = {};
   assignments.forEach(a => {
     lessonSubjectIds[a.data.subject_id] = a;
   });
   
-  const learnedKanji = new Set((await getSubjects('kanji')).filter(s => {
-    return lessonSubjectIds[s.id] !== undefined && lessonSubjectIds[s.id].started_at !== null;
+  const learnedKanji = new Set((await getSubjects({types: 'kanji'})).filter(s => {
+    return lessonSubjectIds[s.id] !== undefined;
   }).map(s => {
     return s.data.characters;
   }));
 
-  const learnableVocab = new Set((await getSubjects('vocabulary,kana_vocabulary')).map(s => {
+  const learnableVocab = new Set((await getSubjects({types: 'vocabulary,kana_vocabulary'})).map(s => {
     return s.data.characters;
   }));
 
@@ -217,6 +249,7 @@ async function showComprehensibleVocab() {
   for (const v of leftover) {
     console.log(v.japanese.length === 1 ? v.japanese.length[0] : v.japanese);
   }
+  process.exit(0);
 }
 
 
@@ -230,13 +263,13 @@ async function showComprehensibleVocab() {
 async function customVocabList() {
   const kanji = JSON.parse(await fs.readFile('kanji.json', 'utf8'));;
   const kanjiByWaniKaniLevel = {};
-  var maxLevel = 0;
+  let maxLevel = 0;
   for (const k in kanji) {
     kanjiByWaniKaniLevel[k] = kanji[k].wk_level;
     maxLevel = Math.max(maxLevel, kanji[k].wk_level);
   }
 
-  const subjects = await getSubjects('vocabulary,kana_vocabulary');
+  const subjects = await getSubjects({types: 'vocabulary,kana_vocabulary'});
   const wkVocab = {};
   for (const s of subjects) {
     wkVocab[s.data.characters] = s;
@@ -249,7 +282,7 @@ async function customVocabList() {
       return v;
     }
     
-    var level = 0;
+    let level = 0;
     for (const k of v.slug.matchAll(RE_KANJI)) {
       if (kanjiByWaniKaniLevel[k] !== undefined) {
         level = Math.max(level, kanjiByWaniKaniLevel[k]);
@@ -302,7 +335,7 @@ async function conjugationPractice(minLevel) {
     lessonSubjectIds[a.data.subject_id] = a;
   });
 
-  const subjects = await getSubjects('vocabulary');
+  const subjects = await getSubjects({types: 'vocabulary'});
 
   const vocabToReview = subjects.filter(subject => {
     const assignment = lessonSubjectIds[subject.id];
@@ -320,6 +353,129 @@ async function conjugationPractice(minLevel) {
     return false;
   }).map(subject => subject.data);
   return vocabToReview;
+}
+
+
+// TODO: hints
+// TODO: repeat testing
+// TODO: hiragana transliteration
+// TODO: approximate matches
+async function drill() {
+  const assignments = await getAssignments({
+    srs_stages: '1,2',
+    subject_types: 'kanji,radical',
+  });
+
+  const subjects = await getSubjects({
+    ids: assignments.map((a) => a.data.subject_id).join(','),
+  });
+
+  for (const s of subjects) {
+    console.log(`${s.object} ${s.data.characters}`);
+
+    if (s.object === 'kanji') {
+      const reading = await prompt('Reading: ');
+      const readingMatch = s.data.readings.find((r) => r.reading === reading);
+      if (readingMatch === undefined) {
+        console.log('Wrong!');
+        console.log(s.data.readings);
+      } else if (!readingMatch.accepted_answer) {
+        console.log('Close, but not an accepted answer');
+      } else {
+        console.log('Right!');
+      }
+    }
+
+    const meaning = await prompt('Meaning: ');
+    const meanings = s.data.meanings.concat(s.data.auxiliary_meanings);
+    const meaningMatch = meanings.find((r) => r.meaning.toLowerCase() === meaning.toLowerCase());
+    let correct = meaningMatch !== undefined && meaningMatch.accepted_answer !== false && meaningMatch.type !== 'whitelist';
+    if (correct) {
+      console.log('Right!');
+    } else {
+      console.log('Wrong!');
+      console.log(meanings);
+    }
+  }
+}
+
+
+// TODO: implement
+async function radicalsSync(file) {
+
+}
+
+
+async function radicalsExport() {
+  const sm = await axios.get('https://api.wanikani.com/v2/study_materials', {
+    headers: HEADERS,
+    params: {
+      subject_types: 'radical'
+    }
+  });
+  smBySubjectID = {};
+  for (const d of sm.data.data) {
+    smBySubjectID[d.data.subject_id] = {
+      updated_at: d.data_updated_at,
+      created_at: d.data.created_at,
+      meaning_note: d.data.meaning_note,
+      reading_note: d.data.reading_note,
+      meaning_synonyms: d.data.meaning_synonyms,
+    };
+  }
+
+  const kanji = await getSubjects({ types: 'kanji' });
+  const kanjiBySubjectID = {};
+  const kanjiByChar = {};
+  for (const d of kanji) {
+    kanjiBySubjectID[d.id] = d;
+    kanjiByChar[d.data.characters] = d;
+  }
+
+  const radicals = await getSubjects({ types: 'radical' });
+  const data = radicals.map(d => {
+    const out = {
+      radical_subject: {
+        id: d.id,
+        level: d.data.level,
+        slug: d.data.slug,
+        document_url: d.data.document_url,
+        characters: d.data.characters,
+        meanings: d.data.meanings,
+        auxiliary_meanings: d.data.auxiliary_meanings,
+        amalgamation_subject_ids: d.data.amalgamation_subject_ids.map((sid) => kanjiBySubjectID[sid].data.characters).join(''),
+        meaning_mnemonic: d.data.meaning_mnemonic,
+      },
+      study_material: smBySubjectID[d.id] || {
+        updated_at: null,
+        created_at: null,
+        meaning_note: '',
+        reading_note: '',
+        meaning_synonyms: [],
+      },
+    };
+    const kanji = kanjiByChar[d.data.characters]
+    if (kanji !== undefined) {
+      out.kanji_subject = {
+        id: kanji.id,
+        level: kanji.data.level,
+        slug: kanji.data.slug,
+        document_url: kanji.data.document_url,
+        meanings: kanji.data.meanings,
+        auxiliary_meanings: kanji.data.auxiliary_meanings,
+        readings: kanji.data.readings,
+        component_subject_ids: kanji.data.component_subject_ids,
+        visually_similar: kanji.data.visually_similar_subject_ids.map((sid) => kanjiBySubjectID[sid].data.characters).join(''),
+        meaning_mnemonic: kanji.data.meaning_mnemonic,
+        meaning_hint: kanji.data.meaning_hint,
+        reading_mnemonic: kanji.data.reading_mnemonic,
+        reading_hint: kanji.data.reading_hint,
+      };
+    }
+    return out;
+  });
+  console.log(YAML.stringify(data));
+  process.exit(0);
 }
 
 
@@ -349,6 +505,7 @@ const commands = [
         process.exit(1);
       }
       await moveJLPTVocabToReview(numItems, argv.jlpt);
+      process.exit(0);
     }
   },
   {
@@ -360,6 +517,32 @@ const commands = [
     command: 'vocab-list',
     description: 'Show custom vocabulary list',
     handler: customVocabList
+  },
+  {
+    command: 'drill',
+    description: 'Keep drilling in-review Kanji/Radicals until mastery',
+    handler: drill
+  },
+  {
+    command: 'radicals-sync',
+    description: 'Import user-specific study materials for radicals from a YAML file',
+    builder: {
+      file: {
+        alias: 'f',
+        describe: 'The file from which to import the radical study materials',
+        type: 'file',
+        demandOption: true,
+      }
+    },
+    handler: async (argv) => {
+      await radicalsImport(argv.file);
+      process.exit(0);
+    },
+  },
+  {
+    command: 'radicals-export',
+    description: 'Export user-specific study materials for radicals',
+    handler: radicalsExport
   }
 ];
 

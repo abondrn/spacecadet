@@ -20,6 +20,7 @@
     "mecab-async": "^0.1.2",
     "nbb": "^1.2.190",
     "unofficial-jisho-api": "^2.3.4",
+    "yaml": "^2.7.0",
     "yargs": "^17.7.2"
   }
 }
