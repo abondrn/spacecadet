@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 const fs = require('fs').promises;
-const readline = require('readline');
 
 const axios = require('axios');
 const yargs = require('yargs');
 const YAML = require('yaml');
+const inquirer = require('inquirer').default;
 const { hideBin } = require('yargs/helpers');
 
 
@@ -21,20 +21,6 @@ const HEADERS = {
 const RE_KANJI = /\p{Unified_Ideograph}/ug;
 const RE_KATA = /\p{sc=Katakana}/u;
 const RE_KANJI_NUM = /^第?[一二三四五六七八九十]+/u;
-
-// Create an interface for input and output
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
-const prompt = (question) => {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer);
-    });
-  });
-};
 
 
 /**
@@ -77,6 +63,20 @@ async function getAssignments(params) {
     assignments.push(...response.data.data);
   }
   return assignments;
+}
+
+
+async function startAssignment(assignment_id) {
+  return await axios.put(`https://api.wanikani.com/v2/assignments/${assignment_id}/start`,
+    {assignment: {}},
+    {
+      headers: {
+        'Authorization': `Bearer ${WANIKANI_API_KEY}`,
+        'Wanikani-Revision': '20170710',
+        'Content-Type': 'application/json'
+      }
+    }
+  );
 }
 
 
@@ -186,16 +186,7 @@ async function moveJLPTVocabToReview(numItems, maxJLPTLevel) {
       const numToMove = Math.min(vocabToReview.length, numItems);
       for (let i=0; i < numToMove; i++) {
         const vocab = vocabToReview[i];
-        const assignment = await axios.put(`https://api.wanikani.com/v2/assignments/${vocab.assignment.id}/start`,
-          {assignment: {}},
-          {
-            headers: {
-              'Authorization': `Bearer ${WANIKANI_API_KEY}`,
-              'Wanikani-Revision': '20170710',
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        await startAssignment(vocab.assignment.id);
         console.log(`Moved ${vocab.subject.data.characters} (Level ${vocab.subject.data.level}) to review`);
         console.log(vocab.subject.data);
       }
@@ -315,94 +306,14 @@ async function customVocabList() {
   });
   
   vocab.forEach(v => {
-    //console.log(v);
     console.log(`${v.slug},${v.level.toString()}`);
   });
-}
-
-/**
- * Obtains vocabulary which can be conjugated.
- * @param {Number} minLevel the minimum SRS stage the vocabulary item should be at to be included.
- */
-async function conjugationPractice(minLevel) {
-  const assignments = await getAssignments({
-    started: true,
-    subject_types: 'vocabulary',
-  });
-
-  const lessonSubjectIds = {};
-  assignments.forEach(a => {
-    lessonSubjectIds[a.data.subject_id] = a;
-  });
-
-  const subjects = await getSubjects({types: 'vocabulary'});
-
-  const vocabToReview = subjects.filter(subject => {
-    const assignment = lessonSubjectIds[subject.id];
-    
-    if (assignment === undefined || assignment.data.srs_stage < minLevel) {
-      return false;
-    }
-
-    for (const pos of subject.data.parts_of_speech) {
-      if (['な adjective', 'い adjective', 'intransitive verb', 'ichidan verb', 'transitive verb', 'godan verb', 'verbal noun'].indexOf(pos) !== -1) {
-        return true;
-      }
-    }
-
-    return false;
-  }).map(subject => subject.data);
-  return vocabToReview;
-}
-
-
-// TODO: hints
-// TODO: repeat testing
-// TODO: hiragana transliteration
-// TODO: approximate matches
-async function drill() {
-  const assignments = await getAssignments({
-    srs_stages: '1,2',
-    subject_types: 'kanji,radical',
-  });
-
-  const subjects = await getSubjects({
-    ids: assignments.map((a) => a.data.subject_id).join(','),
-  });
-
-  for (const s of subjects) {
-    console.log(`${s.object} ${s.data.characters}`);
-
-    if (s.object === 'kanji') {
-      const reading = await prompt('Reading: ');
-      const readingMatch = s.data.readings.find((r) => r.reading === reading);
-      if (readingMatch === undefined) {
-        console.log('Wrong!');
-        console.log(s.data.readings);
-      } else if (!readingMatch.accepted_answer) {
-        console.log('Close, but not an accepted answer');
-      } else {
-        console.log('Right!');
-      }
-    }
-
-    const meaning = await prompt('Meaning: ');
-    const meanings = s.data.meanings.concat(s.data.auxiliary_meanings);
-    const meaningMatch = meanings.find((r) => r.meaning.toLowerCase() === meaning.toLowerCase());
-    let correct = meaningMatch !== undefined && meaningMatch.accepted_answer !== false && meaningMatch.type !== 'whitelist';
-    if (correct) {
-      console.log('Right!');
-    } else {
-      console.log('Wrong!');
-      console.log(meanings);
-    }
-  }
 }
 
 
 // TODO: implement
 async function radicalsSync(file) {
-
+  
 }
 
 
@@ -479,6 +390,46 @@ async function radicalsExport() {
 }
 
 
+async function confirm(message) {
+  const result = await inquirer.prompt([{
+    type: 'confirm',
+    message,
+    name: 'answer',
+  }]);
+  return result.answer;
+}
+
+
+// TODO: filter by reading
+// TODO: filter by meaning
+// TODO: when provided no filter, switch to multi select
+async function select(argv) {
+  const assignments = await getAssignments({
+    unlocked: true,
+    immediately_available_for_lessons: true,
+  });
+
+  const lessonSubjectIds = {};
+  assignments.forEach(a => {
+    lessonSubjectIds[a.data.subject_id] = a;
+  });
+
+  const subjects = await getSubjects({types: 'vocabulary,kana_vocabulary'});
+  const vocabToReview = subjects.filter(subject => {
+    if (lessonSubjectIds[subject.id] === undefined) return false;
+    
+    return subject.data.characters.includes(argv.char_query);
+  });
+
+  for (const subject of vocabToReview) {
+    console.log(subject.data);
+    if (await confirm('Add to reviews?')) {
+      await startAssignment(lessonSubjectIds[subject.id].id);
+    }
+  }
+}
+
+
 const commands = [
   {
     command: 'move',
@@ -519,11 +470,6 @@ const commands = [
     handler: customVocabList
   },
   {
-    command: 'drill',
-    description: 'Keep drilling in-review Kanji/Radicals until mastery',
-    handler: drill
-  },
-  {
     command: 'radicals-sync',
     description: 'Import user-specific study materials for radicals from a YAML file',
     builder: {
@@ -543,6 +489,34 @@ const commands = [
     command: 'radicals-export',
     description: 'Export user-specific study materials for radicals',
     handler: radicalsExport
+  },
+  {
+    command: 'select',
+    description: 'Search for items in review matching a query, and optionally moves them to review',
+    builder: {
+      char_query: {
+        alias: 'c',
+        describe: 'Searches characters for this',
+        type: 'string',
+        demandOption: false,
+      },
+      meaning_query: {
+        alias: 'm',
+        describe: 'Searches meanings for this',
+        type: 'string',
+        demandOption: false,
+      },
+      reading_query: {
+        alias: 'r',
+        describe: 'Searches reading for this',
+        type: 'string',
+        demandOption: false,
+      }
+    },
+    handler: async (argv) => {
+      await select(argv);
+      process.exit(0);
+    }
   }
 ];
 
@@ -559,3 +533,8 @@ if (require.main === module) {
     .version('1.0.0')
     .parse());
 }
+
+module.exports = {
+  getSubjects,
+  getAssignments,
+};
